@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────
+# requirements.txt
+# Toyamas Backend Dependencies
+# Install: pip install -r requirements.txt
+# ─────────────────────────────────────────
+
+# Framework utama
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+gunicorn==23.0.0
+
+# HTTP client (untuk request ke Midtrans dan Cloudflare)
+httpx==0.28.1
+
+# MQTT
+paho-mqtt==2.1.0
+
+# JWT
+PyJWT==2.10.1
+
+# Hashing password admin dashboard IoT (middleware/auth.py, create_admin.py)
+# — sebelumnya hilang dari file ini walau sudah dipakai kode sejak login
+# admin pindah dari Google OAuth ke username+password (migration 004).
+bcrypt==4.2.1
+
+# Pydantic (sudah include di FastAPI tapi pin version)
+pydantic==2.10.3
+
+# Database
+# SQLite sudah built-in Python, tidak perlu install
+
+# Environment variables
+python-dotenv==1.0.1
+
+# Async support
+anyio==4.7.0
+
+# Dipakai oleh xendit_webhook_sim.py (skrip simulasi webhook lokal) —
+# tanpa ini fresh install akan gagal dengan "Install dulu: pip install requests"
+requests==2.32.3
+
+# Digunakan untuk menerima file upload di endpoint /api/iot/settings/{machine_id}/signage
+python-multipart==0.0.20

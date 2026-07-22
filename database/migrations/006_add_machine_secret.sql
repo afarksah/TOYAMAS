@@ -1,0 +1,14 @@
+-- Migration 006: kolom `secret` per mesin untuk HMAC (menggantikan satu
+-- MACHINE_SECRET global yang sama untuk semua mesin di .env/firmware).
+--
+-- Nullable DENGAN SENGAJA: mesin yang belum punya secret sendiri (mis.
+-- yang sudah terdaftar sebelum migration ini ada) otomatis fallback ke
+-- MACHINE_SECRET global di config/settings.py — lihat get_machine_secret()
+-- di backend/services/database.py. Ini backward compatible: mesin lama
+-- yang sudah online dengan firmware lama TIDAK akan tiba-tiba putus
+-- komunikasi setelah migration ini jalan.
+--
+-- Mesin BARU yang didaftarkan lewat create_machine() / POST /api/iot/machines
+-- otomatis dapat secret acak unik (secrets.token_hex(16)) yang disimpan di
+-- kolom ini.
+ALTER TABLE machines ADD COLUMN secret TEXT;

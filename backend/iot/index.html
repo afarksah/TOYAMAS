@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOYAMAS — IoT Dashboard</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Leaflet.js (Peta) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- CSS Dashboard — perbaiki path -->
+    <link rel="stylesheet" href="/iot/css/dashboard.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/iot/assets/logo-toyamas.png">
+</head>
+<body>
+
+    <!-- ============================================================ -->
+    <!-- LOGIN PAGE -->
+    <!-- ============================================================ -->
+    <div id="loginPage" class="login-page">
+        <div class="login-container">
+            <div class="login-left">
+                <div class="login-brand">
+                    <img src="/iot/assets/logo-toyamas.png" alt="TOYAMAS" class="login-logo">
+                    <h1>IoT Monitoring</h1>
+                    <p>Dashboard kontrol dan monitoring mesin vending dispenser TOYAMAS</p>
+                </div>
+            </div>
+            <div class="login-right">
+                <div class="login-card">
+                    <div class="login-header">
+                        <h2>Masuk</h2>
+                        <p>Masukkan username dan password admin</p>
+                    </div>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="loginUsername">Username</label>
+                            <input type="text" id="loginUsername" placeholder="admin" required maxlength="16">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Password</label>
+                            <input type="password" id="loginPassword" placeholder="••••••••" required maxlength="16">
+                        </div>
+                        <button type="submit" class="btn-google-login" id="loginBtn">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </button>
+                    </form>
+                    <div id="loginError" class="login-error" style="display:none;"></div>
+                    <div class="login-footer">
+                        <span class="login-dot"></span>
+                        <span class="login-dot"></span>
+                        <span class="login-dot"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DASHBOARD -->
+    <!-- ============================================================ -->
+    <div id="dashboardPage" class="dashboard-page" style="display:none;">
+        <!-- Overlay untuk mobile -->
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+        <!-- SIDEBAR -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <img src="/iot/assets/logo-toyamas.png" alt="TOYAMAS" class="sidebar-logo">
+                <span>TOYAMAS</span>
+                <span class="sidebar-version">v1.3</span>
+            </div>
+
+            <ul class="sidebar-menu">
+                <li class="menu-item active" data-page="overview">
+                    <i class="fas fa-home"></i>
+                    <span>Overview</span>
+                </li>
+                <li class="menu-item" data-page="monitoring">
+                    <i class="fas fa-microchip"></i>
+                    <span>Monitoring</span>
+                </li>
+                <li class="menu-item" data-page="transactions">
+                    <i class="fas fa-receipt"></i>
+                    <span>Transaksi</span>
+                </li>
+                <li class="menu-item" data-page="reports">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Laporan</span>
+                </li>
+                <li class="menu-item" data-page="locations">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Lokasi</span>
+                </li>
+                <li class="menu-item" data-page="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Pengaturan</span>
+                </li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user" id="sidebarUser">
+                    <div class="user-info">
+                        <span id="userName" style="font-weight:600;">Administrator</span>
+                    </div>
+                </div>
+                <button id="logoutBtn" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- TOP BAR -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button id="sidebarToggle" class="btn-sidebar-toggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 id="pageTitle">Overview</h1>
+                </div>
+                <div class="topbar-right">
+                    <span class="topbar-time" id="topbarTime">--:--</span>
+                    <span class="topbar-status">
+                        <span class="status-dot online" id="wsStatusDot"></span>
+                        <span id="wsStatusText">Connecting...</span>
+                    </span>
+                    <span class="topbar-machine" id="topbarMachine">
+                        <i class="fas fa-microchip"></i>
+                        <span id="machineCount">0</span> Mesin
+                    </span>
+                </div>
+            </header>
+
+            <!-- PAGE: OVERVIEW -->
+            <div id="page-overview" class="page-content active">
+                <!-- Stat Cards -->
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fas fa-tint"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statVolume">0</span>
+                            <span class="stat-label">Volume Terjual (Hari Ini)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statRevenue">Rp 0</span>
+                            <span class="stat-label">Pendapatan (Hari Ini)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple"><i class="fas fa-receipt"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statTransactions">0</span>
+                            <span class="stat-label">Transaksi (Hari Ini)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange"><i class="fas fa-server"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statMachines">0/0</span>
+                            <span class="stat-label">Mesin Online</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Machine Cards -->
+                <div class="section-header">
+                    <div>
+                        <h2>Status Mesin</h2>
+                        <span class="section-sub">Update real-time setiap 5 detik</span>
+                    </div>
+                    <button id="addMachineBtn" class="btn-filter">
+                        <i class="fas fa-plus"></i> Tambah Mesin
+                    </button>
+                </div>
+                <div class="machines-grid" id="machinesGrid">
+                    <!-- Dynamic dari JavaScript -->
+                </div>
+
+                <!-- Chart -->
+                <div class="section-header">
+                    <h2>Grafik Penjualan</h2>
+                    <div class="chart-tabs">
+                        <button class="chart-tab active" data-chart="hourly">Per Jam</button>
+                        <button class="chart-tab" data-chart="weekly">Per Minggu</button>
+                        <button class="chart-tab" data-chart="monthly">Per Bulan</button>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <canvas id="salesChart"></canvas>
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="section-header">
+                    <h2>Transaksi Terbaru</h2>
+                    <a href="#" class="view-all" data-page="transactions">Lihat Semua →</a>
+                </div>
+                <div class="table-card">
+                    <table class="transactions-table" id="recentTransactionsTable">
+                        <thead>
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Order ID</th>
+                                <th>Mesin</th>
+                                <th>Volume</th>
+                                <th>Harga</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentTransactionsBody">
+                            <!-- Dynamic dari JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PAGE: MONITORING -->
+            <div id="page-monitoring" class="page-content">
+                <div class="section-header">
+                    <h2>Monitoring Mesin</h2>
+                    <span class="section-sub">Status detail setiap mesin</span>
+                </div>
+                <div id="monitoringContent">
+                    <!-- Dynamic dari JavaScript -->
+                </div>
+            </div>
+
+            <!-- PAGE: TRANSACTIONS -->
+            <div id="page-transactions" class="page-content">
+                <div class="section-header">
+                    <h2>Riwayat Transaksi</h2>
+                    <div class="filter-bar">
+                        <select id="filterMachine" class="filter-select">
+                            <option value="">Semua Mesin</option>
+                        </select>
+                        <select id="filterStatus" class="filter-select">
+                            <option value="">Semua Status</option>
+                            <option value="PAID">PAID</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="FAILED">FAILED</option>
+                            <option value="COMPLETE">COMPLETE</option>
+                            <option value="DISPENSING">DISPENSING</option>
+                            <option value="ABORTED">ABORTED</option>
+                        </select>
+                        <input type="date" id="filterStartDate" class="filter-input">
+                        <input type="date" id="filterEndDate" class="filter-input">
+                        <button id="filterApply" class="btn-filter">Terapkan</button>
+                        <button id="filterReset" class="btn-filter-reset">Reset</button>
+                    </div>
+                </div>
+                <div class="table-card">
+                    <table class="transactions-table" id="transactionsTable">
+                        <thead>
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Order ID</th>
+                                <th>Mesin</th>
+                                <th>Sumber</th>
+                                <th>Volume</th>
+                                <th>Harga</th>
+                                <th>Status Pembayaran</th>
+                                <th>Status Dispense</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsBody">
+                            <!-- Dynamic dari JavaScript -->
+                        </tbody>
+                    </table>
+                    <div class="table-pagination" id="transactionsPagination">
+                        <!-- Dynamic dari JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: REPORTS -->
+            <div id="page-reports" class="page-content">
+                <div class="section-header">
+                    <h2>Laporan Penjualan</h2>
+                    <div class="filter-bar">
+                        <select id="reportMachineFilter" class="filter-select">
+                            <option value="">Semua Mesin</option>
+                        </select>
+                        <div class="report-period">
+                            <button class="report-tab active" data-period="today">Hari Ini</button>
+                            <button class="report-tab" data-period="week">Minggu Ini</button>
+                            <button class="report-tab" data-period="month">Bulan Ini</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-grid" id="reportStats">
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fas fa-tint"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="reportVolume">0</span>
+                            <span class="stat-label">Total Volume</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fas fa-money-bill-wave"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="reportRevenue">Rp 0</span>
+                            <span class="stat-label">Total Pendapatan</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple"><i class="fas fa-receipt"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="reportTransactions">0</span>
+                            <span class="stat-label">Total Transaksi</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange"><i class="fas fa-calculator"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="reportAvg">Rp 0</span>
+                            <span class="stat-label">Rata-rata per Transaksi</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <canvas id="reportChart"></canvas>
+                </div>
+            </div>
+
+            <!-- PAGE: LOCATIONS -->
+            <div id="page-locations" class="page-content">
+                <div class="section-header">
+                    <h2>Lokasi Mesin</h2>
+                    <span class="section-sub">Peta lokasi semua mesin dispenser</span>
+                </div>
+
+                <div class="map-toolbar">
+                    <button id="addLocationBtn" class="btn-filter">
+                        <i class="fas fa-plus"></i> Tambah Lokasi
+                    </button>
+                    <div class="map-search">
+                        <input type="text" id="mapSearchInput" class="filter-input"
+                               placeholder="Cari alamat...">
+                        <button id="mapSearchBtn" class="btn-filter-reset" title="Cari alamat">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <button id="refreshMapBtn" class="btn-filter-reset" title="Refresh">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+
+                <div class="map-card">
+                    <div id="locationMap" class="map-container"></div>
+                    <div class="map-legend" id="mapLegend">
+                        <!-- Dynamic dari JavaScript -->
+                    </div>
+                </div>
+
+                <div class="section-header" style="margin-top:20px;">
+                    <h2 style="font-size:0.95rem;">Daftar Lokasi Mesin</h2>
+                </div>
+                <div class="table-card">
+                    <table class="transactions-table" id="locationsTable">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Mesin</th>
+                                <th>Alamat</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="locationsTableBody">
+                            <!-- Dynamic dari JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PAGE: SETTINGS (diperbaharui) -->
+            <div id="page-settings" class="page-content">
+                <div class="section-header">
+                    <h2>Pengaturan Mesin</h2>
+                    <span class="section-sub">Kelola konfigurasi per mesin</span>
+                </div>
+
+                <!-- Global Settings -->
+                    <div class="settings-card" style="margin-bottom:16px;">
+                        <h3><i class="fas fa-globe"></i> Pengaturan Global (Default)</h3>
+                        <div class="settings-item">
+                            <label>Default Harga / Liter (Rp)</label>
+                            <input type="number" id="globalDefaultPrice" class="filter-input" style="width:150px;" min="1">
+                            <button id="globalSaveBtn" class="btn-filter" style="margin-left:8px;">
+                                <i class="fas fa-save"></i> Terapkan ke Semua Mesin
+                            </button>
+                        </div>
+                        <div class="settings-item">
+                            <label>Default Mode</label>
+                            <select id="globalDefaultMode" class="filter-select" style="width:150px;">
+                                <option value="RO">RO (Auto-fill)</option>
+                                <option value="MANUAL">Manual</option>
+                            </select>
+                            <button id="globalModeSaveBtn" class="btn-filter" style="margin-left:8px;">
+                                <i class="fas fa-save"></i> Terapkan ke Semua Mesin
+                            </button>
+                        </div>
+                        <div id="globalSettingsResult" style="margin-top:8px;font-size:0.8rem;"></div>
+                        <span class="form-hint">Perubahan akan langsung menyinkron ke semua mesin yang aktif.</span>
+                    </div>
+
+                <!-- Pilih mesin -->
+                <div class="filter-bar" style="margin-bottom: 16px;">
+                    <select id="settingsMachineSelect" class="filter-select">
+                        <option value="">Pilih Mesin...</option>
+                    </select>
+                    <button id="settingsLoadBtn" class="btn-filter">Muat</button>
+                </div>
+
+                <!-- Form pengaturan (hidden sampai mesin dipilih) -->
+                <div id="settingsFormContainer" style="display:none;">
+                    <div class="settings-grid">
+                        <!-- Kolom kiri: konfigurasi dasar -->
+                        <div class="settings-card">
+                            <h3><i class="fas fa-sliders-h"></i> Konfigurasi Dasar</h3>
+                            <div class="settings-item">
+                                <label>Harga per Liter (Rp)</label>
+                                <input type="number" id="setPrice" class="filter-input" style="width:120px;" min="1">
+                            </div>
+                            <div class="settings-item">
+                                <label>Mode Operasi</label>
+                                <select id="setMode" class="filter-select" style="width:120px;">
+                                    <option value="RO">RO (Auto-fill)</option>
+                                    <option value="MANUAL">Manual</option>
+                                </select>
+                            </div>
+                            <div class="settings-item">
+                                <label>Timeout Standby (detik)</label>
+                                <input type="number" id="setTimeout" class="filter-input" style="width:120px;" min="10" max="300">
+                            </div>
+                            <div class="settings-item">
+                                <label>Durasi Slide (ms)</label>
+                                <input type="number" id="setSlideDuration" class="filter-input" style="width:120px;" min="1000" max="60000" step="500">
+                            </div>
+                            <div class="settings-item">
+                                <label>Signage Aktif</label>
+                                <div class="toggle-switch on" id="setSignageToggle"></div>
+                            </div>
+                            <button id="settingsSaveBtn" class="btn-filter" style="margin-top:12px; width:100%;">
+                                <i class="fas fa-save"></i> Simpan Pengaturan
+                            </button>
+                            <div id="settingsSaveResult" style="margin-top:8px;"></div>
+                        </div>
+
+                        <!-- Kolom kanan: Ganti PIN -->
+                        <div class="settings-card">
+                            <h3><i class="fas fa-key"></i> Ganti PIN Admin</h3>
+                            <div class="settings-item">
+                                <label>PIN Lama</label>
+                                <input type="password" id="setOldPin" class="filter-input" style="width:120px;" maxlength="4" inputmode="numeric">
+                            </div>
+                            <div class="settings-item">
+                                <label>PIN Baru</label>
+                                <input type="password" id="setNewPin" class="filter-input" style="width:120px;" maxlength="4" inputmode="numeric">
+                            </div>
+                            <div class="settings-item">
+                                <label>Konfirmasi PIN</label>
+                                <input type="password" id="setConfirmPin" class="filter-input" style="width:120px;" maxlength="4" inputmode="numeric">
+                            </div>
+                            <button id="settingsPinBtn" class="btn-filter" style="margin-top:12px; width:100%; background:var(--warning);">
+                                <i class="fas fa-key"></i> Ganti PIN
+                            </button>
+                            <div id="settingsPinResult" style="margin-top:8px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Manajemen Slide Signage -->
+                    <div class="settings-card" style="margin-top:16px;">
+                        <h3><i class="fas fa-images"></i> Manajemen Slide Signage</h3>
+                        <div id="slideListContainer">
+                            <!-- Daftar slide akan di-render di sini -->
+                            <p style="color:var(--text-light);">Belum ada slide. Upload gambar/video di bawah.</p>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                            <input type="file" id="slideFileInput" accept=".jpg,.jpeg,.png,.mp4" style="display:none;">
+                            <button id="slideUploadBtn" class="btn-filter"><i class="fas fa-upload"></i> Upload Slide</button>
+                            <input type="text" id="slideCaptionInput" placeholder="Caption (opsional)" class="filter-input" style="flex:1;">
+                            <button id="slideUploadConfirm" class="btn-filter" style="background:var(--success);">Upload</button>
+                        </div>
+                        <div id="slideUploadResult" style="margin-top:8px;"></div>
+                    </div>
+
+                    
+
+                </div>
+
+            
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL: TAMBAH MESIN -->
+    <!-- ============================================================ -->
+    <div id="addMachineModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fas fa-microchip"></i> Tambah Mesin Baru</h3>
+                <button type="button" id="addMachineCloseBtn" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="modal-content-wrap">
+                <div class="modal-body">
+                    <div id="addMachineError" class="modal-error" style="display:none;"></div>
+
+                    <!-- State sukses: tampil setelah mesin berhasil didaftarkan,
+                         menggantikan form, supaya secret-nya tidak hilang begitu
+                         saja setelah modal ditutup. -->
+                    <div id="addMachineSuccessState" style="display:none;">
+                        <div class="modal-success-banner">
+                            <i class="fas fa-check-circle"></i>
+                            Mesin <strong id="successMachineId"></strong> berhasil didaftarkan.
+                        </div>
+                        <div class="form-group">
+                            <label>HMAC Secret (MACHINE_SECRET firmware)</label>
+                            <div class="secret-copy-row">
+                                <input type="text" id="successMachineSecret" readonly>
+                                <button type="button" id="copySecretBtn" class="btn-filter-reset" title="Salin">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <span class="form-hint">
+                                <strong>Catat/salin sekarang.</strong> Tempel persis ke
+                                <code>MACHINE_SECRET</code> di firmware unit ini sebelum
+                                di-flash. Kalau lupa, bisa dilihat lagi lewat menu admin
+                                (endpoint <code>GET /api/iot/machines/{id}/secret</code>).
+                            </span>
+                        </div>
+                    </div>
+
+                    <form id="addMachineFormFields">
+                        <div class="form-group">
+                            <label for="fldMachineId">ID Mesin *</label>
+                            <input type="text" id="fldMachineId" placeholder="TYM-002" required
+                                   pattern="[A-Za-z0-9\-_]+" maxlength="32">
+                            <span class="form-hint">Harus sama persis dengan MACHINE_ID di firmware ESP32 mesin ini.</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="fldMachineName">Nama Mesin *</label>
+                            <input type="text" id="fldMachineName" placeholder="Toyamas Cabang 2" required maxlength="100">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="fldMachinePin">PIN Admin (4 digit) *</label>
+                                <input type="password" id="fldMachinePin" placeholder="••••" required
+                                       pattern="\d{4}" maxlength="4" inputmode="numeric">
+                            </div>
+                            <div class="form-group">
+                                <label for="fldMachineMode">Mode</label>
+                                <select id="fldMachineMode">
+                                    <option value="RO">RO (auto-fill)</option>
+                                    <option value="MANUAL">Manual (isi ulang galon)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="fldMachinePrice">Harga / Liter (Rp)</label>
+                                <input type="number" id="fldMachinePrice" value="500" min="1" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="fldMachineLocation">Lokasi (opsional)</label>
+                                <input type="text" id="fldMachineLocation" placeholder="Jl. Contoh No. 5" maxlength="200">
+                            </div>
+                        </div>
+
+                        <div class="form-hint" style="margin-top:4px;">
+                            HMAC secret unik untuk mesin ini akan di-generate otomatis
+                            (direkomendasikan, bukan MACHINE_SECRET global) dan ditampilkan
+                            setelah disimpan. Firmware unit ini tetap harus di-build dengan
+                            <code>MACHINE_ID</code> dan topic MQTT yang sama persis.
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" id="addMachineFormFooter">
+                    <button type="button" id="addMachineCancelBtn" class="btn-filter-reset">Batal</button>
+                    <button type="submit" form="addMachineFormFields" id="addMachineSubmitBtn" class="btn-filter">
+                        <i class="fas fa-plus"></i> Simpan Mesin
+                    </button>
+                </div>
+                <div class="modal-footer" id="addMachineSuccessFooter" style="display:none;">
+                    <button type="button" id="addMachineDoneBtn" class="btn-filter">Selesai</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL: TAMBAH / EDIT LOKASI -->
+    <!-- ============================================================ -->
+    <div id="locationModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-marker-alt"></i> <span id="locationModalTitle">Tambah Lokasi</span></h3>
+                <button type="button" id="locationCloseBtn" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="modal-content-wrap">
+                <div class="modal-body">
+                    <div id="locationError" class="modal-error" style="display:none;"></div>
+
+                    <form id="locationFormFields">
+                        <div class="form-group">
+                            <label for="fldLocMachine">Mesin *</label>
+                            <select id="fldLocMachine" required></select>
+                            <span class="form-hint">Hanya mesin aktif yang ditampilkan. Mesin yang sudah punya lokasi akan otomatis masuk ke mode edit.</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="fldLocAddress">Alamat</label>
+                            <input type="text" id="fldLocAddress" placeholder="Jl. Merpati No.12, Makassar" maxlength="200">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="fldLocLat">Latitude *</label>
+                                <input type="number" id="fldLocLat" step="any" placeholder="-5.147665" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="fldLocLng">Longitude *</label>
+                                <input type="number" id="fldLocLng" step="any" placeholder="119.432731" required>
+                            </div>
+                        </div>
+
+                        <button type="button" id="pickFromMapBtn" class="btn-filter-reset" style="width:100%;">
+                            <i class="fas fa-crosshairs"></i> Ambil dari Peta
+                        </button>
+                        <span class="form-hint" id="pickFromMapHint" style="display:none;margin-top:8px;">
+                            <i class="fas fa-hand-pointer"></i> Klik pada peta untuk mengisi koordinat...
+                        </span>
+                    </form>
+                </div>
+                <div class="modal-footer" style="justify-content:space-between;">
+                    <button type="button" id="deleteMachineBtn" class="btn-filter-reset btn-danger" style="display:none;">
+                        <i class="fas fa-trash"></i> Hapus Mesin
+                    </button>
+                    <div style="display:flex;gap:10px;margin-left:auto;">
+                        <button type="button" id="locationCancelBtn" class="btn-filter-reset">Batal</button>
+                        <button type="submit" form="locationFormFields" id="locationSubmitBtn" class="btn-filter">
+                            <i class="fas fa-check"></i> Simpan Lokasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SCRIPTS — perbaiki path -->
+    <!-- ============================================================ -->
+    <!-- Google Identity Services — WAJIB dimuat sebelum auth.js -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="/iot/js/auth.js"></script>
+    <script src="/iot/js/websocket.js"></script>
+    <script src="/iot/js/charts.js"></script>
+    <script src="/iot/js/transactions.js"></script>
+    <script src="/iot/js/location.js"></script>
+    <script src="/iot/js/app.js"></script>
+
+</body>
+</html>

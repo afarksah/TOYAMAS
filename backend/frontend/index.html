@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOYAMAS — Dispenser Air Isi Ulang</title>
+  
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/iot/assets/logo-toyamas.png">
+</head>
+<body>
+  
+  <div id="screen">
+        <!-- PAGE 1: STANDBY / SIGNAGE -->
+    <div id="page-standby" class="page active" onclick="goTo('page-method')">
+        <video id="videoSignage" autoplay loop muted playsinline></video>
+        <img id="imageSignage" alt="" style="display:none;" />
+        <div class="drops-deco" id="dropsDeco"></div>
+        <div class="signage-header">
+        <div class="brand-logo">TOY<span>AMAS</span></div>
+        <div class="signage-time">
+            <div class="t-clock" id="sClock">00:00</div>
+            <div class="t-date" id="sDate">—</div>
+        </div>
+        </div>
+        <!-- Ganti water-visual dengan logo -->
+        <div class="logo-container" id="logoContainer">
+            <img src="assets/logo-toyamas.png" alt="TOYAMAS" class="main-logo" id="mainLogo">
+        </div>
+
+        <div class="slide-area">
+        <div class="slide-card active" id="slide0">
+            <div class="slide-eyebrow">Air Bersih Premium</div>
+            <div class="slide-headline">Teknologi Reverse Osmosis untuk Air Murni Setiap Saat</div>
+            <div class="slide-body">Air isi ulang TOYAMAS diproses dengan teknologi RO 5 tahap. Bersih, segar, dan aman untuk seluruh keluarga.</div>
+        </div>
+        <div class="slide-card" id="slide1">
+            <div class="slide-eyebrow">Harga Terjangkau</div>
+            <div class="slide-headline">Mulai <span id="signagePrice">Rp 500</span> per Liter, Hemat hingga 80% vs Air Kemasan</div>
+            <div class="slide-body">Bawa galon sendiri, isi sesuai kebutuhan. Tidak perlu beli air kemasan mahal setiap hari.</div>
+        </div>
+        <div class="slide-card" id="slide2">
+            <div class="slide-eyebrow">Pembayaran Mudah</div>
+            <div class="slide-headline">Bayar Pakai QRIS — GoPay, OVO, Dana & Semua E-Wallet</div>
+            <div class="slide-body">Scan QR, bayar, dan air langsung mengalir. Proses kurang dari 30 detik. Tanpa uang tunai, tanpa antri.</div>
+        </div>
+        <!-- Video slide (slot 3) -->
+        <div class="slide-card" id="slide3">
+            <div class="slide-eyebrow">Kualitas Terjamin</div>
+            <div class="slide-headline">Diuji Setiap Hari, Bersertifikat Dinas Kesehatan</div>
+            <div class="slide-body">Filter diganti rutin. Kualitas air selalu dipantau. Tenang, aman, dan terpercaya.</div>
+        </div>
+        
+        <div class="slide-dots">
+            <div class="sdot on" id="sdot0"></div>
+            <div class="sdot" id="sdot1"></div>
+            <div class="sdot" id="sdot2"></div>
+            <div class="sdot" id="sdot3"></div>
+        </div>
+        </div>
+        <div class="tap-prompt">
+        <div class="tap-ring">
+            <svg viewBox="0 0 24 24"><path d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6c0-.83-.67-1.5-1.5-1.5S10 6.67 10 7.5v10.74l-3.43-.72c-.08-.01-.15-.03-.24-.03-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.91-1.38z"/></svg>
+            Ketuk layar untuk isi ulang air
+        </div>
+        </div>
+    </div>
+
+    <div id="page-method" class="page">
+        <div class="app-header">
+        <div class="app-brand">TOY<span>AMAS</span></div>
+        <button class="btn-back" onclick="goToStandby()">✕ Keluar</button>
+        </div>
+        <div class="method-body">
+        <div style="text-align: center; margin-bottom: 12px;">
+            <h2 style="font-size: 1.2rem; font-weight: 800; color: var(--text);">Pilih Metode Ambil Air</h2>
+            <p style="font-size: .78rem; color: var(--muted); margin-top: 4px;">Silakan pilih cara transaksi yang Anda inginkan</p>
+        </div>
+        
+        <div class="method-btn-card" onclick="goToMenu()">
+            <div class="method-icon">💧</div>
+            <div>
+            <div class="method-title">Beli & Bayar di Kiosk</div>
+            <div class="method-desc">Pesan ukuran volume langsung di mesin dan bayar instan menggunakan QRIS / E-Wallet.</div>
+            </div>
+        </div>
+
+        <div class="method-btn-card" onclick="goToTicketSync()">
+            <div class="method-icon">📱</div>
+            <div>
+            <div class="method-title">Ambil Air via Tiket Aplikasi</div>
+            <div class="method-desc">Masukkan 6 digit kode tiket dari struk pembelian Anda, lalu scan QR dengan aplikasi Toyamas.</div>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- PAGE 1.6: INPUT KODE TIKET (BARU) -->
+    <div id="page-ticket-code" class="page">
+        <div class="app-header">
+            <div class="app-brand">TOY<span>AMAS</span></div>
+            <button class="btn-back" onclick="goTo('page-method')">← Kembali</button>
+        </div>
+        <div class="ticket-code-body">
+            <div class="ticket-code-icon">🎫</div>
+            <div class="ticket-code-title">Masukkan Kode Tiket</div>
+            <div class="ticket-code-sub">Lihat 6 digit terakhir kode tiket pada struk pembelian Anda</div>
+
+            <div class="ticket-code-input-group">
+                <input type="text" id="ticketCodeInput" maxlength="6" placeholder="6 digit" inputmode="text" class="ticket-code-field" autofocus>
+                <button class="btn-ticket-verify" id="btnVerifyCode">Cari Tiket →</button>
+            </div>
+
+            <div id="ticketCodeError" class="ticket-code-error" style="display:none;"></div>
+            <div class="ticket-code-hint">Contoh: dari kode <strong>TKT-01KTWDXX2K...MPH6GV</strong>, masukkan <strong>MPH6GV</strong></div>
+
+            <div id="ticketCodeLoading" style="display:none; text-align:center; margin-top:16px;">
+                <div class="spinner"></div>
+                <div style="font-size:.7rem;color:var(--muted);margin-top:4px;">Memeriksa kode...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 2.5: HASIL VERIFIKASI TIKET (QR + INFO) -->
+    <div id="page-ticket" class="page">
+        <div class="app-header">
+            <div class="app-brand">TOY<span>AMAS</span></div>
+            <button class="btn-back" onclick="goTo('page-method')">← Kembali</button>
+        </div>
+        <div class="ticket-body">
+            <div class="ticket-result-info">
+                <div class="ticket-user-name" id="ticketUserName">👤 Budi Santoso</div>
+                <div class="ticket-code-display" id="ticketCodeDisplay">TKT-01KTWDXX2K...MPH6GV</div>
+                <div class="ticket-volume-display" id="ticketVolumeDisplay">750 ml</div>
+            </div>
+
+            <div class="qr-container">
+                <canvas id="ticketQrCanvas" class="qr-code-svg" width="180" height="180"></canvas>
+                <div class="qr-scan-line"></div>
+                <div class="qr-corner tl"></div><div class="qr-corner tr"></div>
+                <div class="qr-corner bl"></div><div class="qr-corner br"></div>
+            </div>
+
+            <div class="qr-timer-wrap">
+                <div class="qr-timer-label">QR Sesi kedaluwarsa dalam</div>
+                <div class="qr-timer" id="ticketTimer">02:00</div>
+            </div>
+
+            <div class="ticket-scan-instruction">
+                📱 Buka aplikasi Toyamas di HP, pilih <strong>Scan Kiosk</strong>, dan arahkan kamera ke QR di atas.
+            </div>
+
+            <!-- Tombol simulasi sudah DIHAPUS sesuai permintaan -->
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="ticketVerifModal" style="align-items: center;">
+        <div class="ticket-pop-sheet">
+        <div class="v-icon">✓</div>
+        <div class="v-title">Tiket Terverifikasi!</div>
+        
+        <div class="v-details">
+            <div class="vd-row"><span class="vd-key">Nomor Tiket</span><span class="vd-val" id="vTicketNum">TYM-89421A</span></div>
+            <div class="vd-row"><span class="vd-key">Volume Kuota</span><span class="vd-val" id="vTicketVol">5.0 Liter</span></div>
+            <div class="vd-row"><span class="vd-key">Metode Potong</span><span class="vd-val">Saldo Aplikasi</span></div>
+        </div>
+        
+        <p style="font-size: .72rem; color: var(--muted); line-height: 1.4; margin-bottom: 16px;">
+            Data valid. Menuju halaman persiapan pengisian air...
+        </p>
+        
+        <button class="btn-pay" id="btnTicketProceed" style="background:linear-gradient(135deg,#34C38F 0%,#28a871 100%);box-shadow:0 6px 20px rgba(52,195,143,.3);">
+            Mulai Pengisian Air →
+        </button>
+        </div>
+    </div>
+
+
+    <!-- PAGE 2: MENU / ORDER — full page layout -->
+    <div id="page-menu" class="page">
+        <div class="app-header">
+        <div class="app-brand">TOY<span>AMAS</span></div>
+        <div class="header-right">
+            <div class="hdr-badge">Air RO</div>
+            <button class="btn-back" onclick="goTo('page-method')">← Kembali</button>
+        </div>
+        </div>
+
+        <div class="menu-body">
+            <!-- Galon status -->
+            <div style="flex-shrink:0;">
+                <div class="section-title">Status Stok Air</div>
+                <div class="galon-strip">
+                <div class="galon-tile">
+                    <div class="gt-top">
+                    <div class="gt-label">Galon 1</div>
+                    <div class="gt-status ok" id="gt1s">Normal</div>
+                    </div>
+                    <div class="mini-tank-row">
+                    <div class="mini-tank"><div class="mini-fill" id="mf1" style="height:75%"></div></div>
+                    <div class="mini-stats">
+                        <div class="mini-pct" id="mp1">75%</div>
+                        <div class="mini-lit" id="ml1">14.3 Liter</div>
+                    </div>
+                    </div>
+                </div>
+                <div class="galon-tile">
+                    <div class="gt-top">
+                    <div class="gt-label">Galon 2</div>
+                    <div class="gt-status ok" id="gt2s">Normal</div>
+                    </div>
+                    <div class="mini-tank-row">
+                    <div class="mini-tank"><div class="mini-fill" id="mf2" style="height:45%"></div></div>
+                    <div class="mini-stats">
+                        <div class="mini-pct" id="mp2">45%</div>
+                        <div class="mini-lit" id="ml2">8.6 Liter</div>
+                    </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- Volume selector — fills available space -->
+            <div class="vol-section">
+                <div class="section-title">Pilih Volume Air</div>
+                <div class="vol-grid">
+
+                <div class="vol-tile" onclick="selectVol(this, 0.25)">
+                    <svg viewBox="0 0 60 90" class="bottle-icon" aria-hidden="true">
+                    <path d="M24 4h12v8h-12z" fill="var(--sky-deep)"/>
+                    <rect x="22" y="12" width="16" height="4" fill="var(--sky)"/>
+                    <path d="M20 18 Q20 16 22 16 L38 16 Q40 16 40 18 L42 24 Q44 28 44 34 L44 80 Q44 86 38 86 L22 86 Q16 86 16 80 L16 34 Q16 28 18 24 Z" fill="var(--sky-pale)" stroke="var(--sky)" stroke-width="1.5"/>
+                    <rect x="17" y="40" width="26" height="30" rx="2" fill="var(--sky-light)" opacity="0.5"/>
+                    </svg>
+                    <span class="vt-name">MINI</span>
+                    <span class="vt-ml-badge">250<small>ml</small></span>
+                </div>
+
+                <div class="vol-tile" onclick="selectVol(this, 0.35)">
+                    <svg viewBox="0 0 60 90" class="bottle-icon" aria-hidden="true">
+                    <ellipse cx="30" cy="10" rx="9" ry="4" fill="var(--sky-deep)"/>
+                    <rect x="21" y="10" width="18" height="6" fill="var(--sky)"/>
+                    <path d="M18 18 Q18 16 20 16 L40 16 Q42 16 42 18 L44 30 Q46 36 46 44 L46 78 Q46 86 38 86 L22 86 Q14 86 14 78 L14 44 Q14 36 16 30 Z" fill="var(--sky-pale)" stroke="var(--sky)" stroke-width="1.5"/>
+                    <rect x="15" y="46" width="30" height="32" rx="3" fill="var(--sky-light)" opacity="0.5"/>
+                    </svg>
+                    <span class="vt-name">SMALL</span>
+                    <span class="vt-ml-badge">350<small>ml</small></span>
+                </div>
+
+                <div class="vol-tile sel" onclick="selectVol(this, 0.5)" id="defaultVol">
+                    <svg viewBox="0 0 60 90" class="bottle-icon" aria-hidden="true">
+                    <rect x="24" y="2" width="12" height="6" rx="2" fill="var(--sky-deep)"/>
+                    <rect x="20" y="8" width="20" height="8" rx="3" fill="var(--sky)"/>
+                    <path d="M16 20 Q16 17 19 17 L41 17 Q44 17 44 20 L46 32 Q48 40 48 48 L48 80 Q48 88 38 88 L22 88 Q12 88 12 80 L12 48 Q12 40 14 32 Z" fill="var(--sky-pale)" stroke="var(--sky)" stroke-width="1.5"/>
+                    <rect x="13" y="50" width="34" height="34" rx="3" fill="var(--sky-light)" opacity="0.5"/>
+                    </svg>
+                    <span class="vt-name">MEDIUM</span>
+                    <span class="vt-ml-badge">500<small>ml</small></span>
+                </div>
+
+                <div class="vol-tile" onclick="selectVol(this, 0.75)">
+                    <svg viewBox="0 0 60 90" class="bottle-icon" aria-hidden="true">
+                    <rect x="25" y="2" width="10" height="5" rx="2" fill="var(--sky-deep)"/>
+                    <path d="M22 7 Q22 5 24 5 L36 5 Q38 5 38 7 L38 13 Q38 15 36 15 L24 15 Q22 15 22 13 Z" fill="var(--sky)"/>
+                    <path d="M19 17 Q19 15 21 15 L39 15 Q41 15 41 17 L42 26 Q44 32 44 40 L44 82 Q44 88 39 88 L21 88 Q16 88 16 82 L16 40 Q16 32 18 26 Z" fill="var(--sky-pale)" stroke="var(--sky)" stroke-width="1.5"/>
+                    <rect x="17" y="42" width="26" height="40" rx="2" fill="var(--sky-light)" opacity="0.5"/>
+                    </svg>
+                    <span class="vt-name">DAILY</span>
+                    <span class="vt-ml-badge">750<small>ml</small></span>
+                </div>
+
+                <div class="vol-tile" onclick="selectVol(this, 1)">
+                    <svg viewBox="0 0 60 90" class="bottle-icon" aria-hidden="true">
+                    <rect x="25" y="1" width="10" height="6" rx="2" fill="var(--sky-deep)"/>
+                    <rect x="22" y="7" width="16" height="6" fill="var(--sky)"/>
+                    <path d="M20 15 Q20 13 22 13 L38 13 Q40 13 40 15 L41 22 Q43 28 43 36 L43 84 Q43 89 38 89 L22 89 Q17 89 17 84 L17 36 Q17 28 19 22 Z" fill="var(--sky-pale)" stroke="var(--sky)" stroke-width="1.5"/>
+                    <rect x="18" y="38" width="24" height="44" rx="2" fill="var(--sky-light)" opacity="0.5"/>
+                    </svg>
+                    <span class="vt-name">LARGE</span>
+                    <span class="vt-ml-badge">1000<small>ml</small></span>
+                </div>
+
+                <div class="vol-tile" onclick="selectVol(this, 1.2)">
+                    <svg viewBox="0 0 60 90" class="bottle-icon" aria-hidden="true">
+                    <line x1="40" y1="6" x2="40" y2="2" stroke="var(--sky-deep)" stroke-width="2.5" stroke-linecap="round"/>
+                    <ellipse cx="28" cy="9" rx="11" ry="4" fill="var(--sky-deep)"/>
+                    <path d="M16 16 Q16 13 19 13 L39 13 L40 13 Q42 13 42 16 L43 26 L44 80 Q44 88 36 88 L20 88 Q12 88 13 80 L14 26 Z" fill="var(--sky-pale)" stroke="var(--sky)" stroke-width="1.5"/>
+                    <path d="M44 30 Q52 30 52 40 Q52 48 44 48" fill="none" stroke="var(--sky)" stroke-width="2.5" stroke-linecap="round"/>
+                    <rect x="15" y="44" width="27" height="40" rx="2" fill="var(--sky-light)" opacity="0.5"/>
+                    </svg>
+                    <span class="vt-name">EXTRA</span>
+                    <span class="vt-ml-badge">1200<small>ml</small></span>
+                </div>
+
+                </div>
+
+                <!-- Custom Volume — baris terpisah di bawah grid 6 botol -->
+                <div class="vol-tile custom-tile-wide" id="customVolTile" onclick="openCustomKeyboard()">
+                    <span class="ctw-icon" id="customVolDisplay">✏️</span>
+                    <span class="ctw-text">
+                    <span class="vt-custom-label" id="customVolLabel">Custom Volume</span>
+                    <span class="ctw-hint">Atur volume sendiri (ml)</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Price -->
+        <div class="info-menu">
+            <div class="price-card">
+                <div>
+                <div class="pc-label">Total yang Dibayar</div>
+                <div class="pc-detail" id="priceDetail">500 ml × Rp 500/L</div>
+                </div>
+                <div class="pc-price" id="totalPrice">Rp 250</div>
+            </div>
+
+            <!-- Info chips -->
+            <div class="info-chips">
+                <div class="info-chip">🔬 Tersertifikasi RO 5 Tahap</div>
+                <div class="info-chip">📞 WA: 0812-3456-7890</div>
+                <div class="info-chip">⏰ 24 Jam Setiap Hari</div>
+            </div>
+        </div>
+
+            <div class="menu-footer">
+                <button class="btn-pay" id="btnPay" onclick="goToPayment()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+                    Lanjut ke Pembayaran — <span id="btnPrice">Rp 250</span>
+                </button>
+            </div>
+        
+    </div>
+
+
+    <!-- PAGE 3: PAYMENT METHOD -->
+    <div id="page-payment" class="page">
+        <div class="app-header">
+        <div class="app-brand">TOY<span>AMAS</span></div>
+        <button class="btn-back" onclick="goTo('page-menu')">← Kembali</button>
+        </div>
+        <div class="pay-body">
+        <div class="order-summary">
+            <div style="font-size:.8rem;font-weight:700;margin-bottom:10px;">Ringkasan Pesanan</div>
+            <div class="os-row"><span class="os-key">Volume air</span><span id="osSummaryVol">500 ml</span></div>
+            <div class="os-row"><span class="os-key">Harga per liter</span><span id="osPricePerL">Rp 500</span></div>
+            <div class="os-row"><span class="os-key">Subtotal</span><span id="osSummaryPrice">Rp 2.500</span></div>
+            <div class="os-row total"><span>Total Bayar</span><span id="osSummaryTotal">Rp 2.500</span></div>
+        </div>
+        <div>
+            <div class="section-title">Pilih Dompet Digital</div>
+            <div class="pay-methods">
+            <div class="pay-method sel" onclick="selectWallet(this,'QRIS Universal')">
+                <div class="pm-icon" style="background:#e8f4ff;color:#2A91D8;font-size:.7rem;font-weight:800;">QRIS</div>
+                <div><div class="pm-name">QRIS Universal</div><div class="pm-desc">GoPay · OVO · Dana · Shopeepay · Semua e-wallet</div></div>
+                <div class="pm-check"></div>
+            </div>
+            <div class="pay-method" onclick="selectWallet(this,'GoPay')">
+                <div class="pm-icon" style="background:#e8f8f0;font-size:1.1rem;">🟢</div>
+                <div><div class="pm-name">GoPay</div><div class="pm-desc">Gojek · Scan langsung dari aplikasi</div></div>
+                <div class="pm-check"></div>
+            </div>
+            <div class="pay-method" onclick="selectWallet(this,'OVO')">
+                <div class="pm-icon" style="background:#f0ebff;font-size:1.1rem;">🟣</div>
+                <div><div class="pm-name">OVO</div><div class="pm-desc">OVO Cash & OVO Points diterima</div></div>
+                <div class="pm-check"></div>
+            </div>
+            <div class="pay-method" onclick="selectWallet(this,'Dana')">
+                <div class="pm-icon" style="background:#e8f4ff;font-size:1.1rem;">🔵</div>
+                <div><div class="pm-name">Dana</div><div class="pm-desc">Dana balance & kartu debit terintegrasi</div></div>
+                <div class="pm-check"></div>
+            </div>
+            <div class="pay-method" onclick="selectWallet(this,'ShopeePay')">
+                <div class="pm-icon" style="background:#fff2e8;font-size:1.1rem;">🟠</div>
+                <div><div class="pm-name">ShopeePay</div><div class="pm-desc">Shopee & SPayLater tersedia</div></div>
+                <div class="pm-check"></div>
+            </div>
+            </div>
+        </div>
+        </div>
+        <div class="pay-footer">
+        <button class="btn-pay" onclick="goToQR()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21h8v-8H3v8zm2-6h4v4H5v-4zm13-2h-2v2h2v-2zm0 4h-2v2h2v-2zm2-4h-2v2h2v-2zm0 4h-2v2h2v-2zm-4-8h-2v2h2v-2zm2 0h-2v2h2v-2zm2 0h-2v2h2v-2z"/></svg>
+            Tampilkan Kode QR
+        </button>
+        </div>
+    </div>
+
+
+    <!-- PAGE 4: QR CODE -->
+    <div id="page-qr" class="page">
+        <div class="app-header">
+        <div class="app-brand">TOY<span>AMAS</span></div>
+        <button class="btn-back" onclick="goTo('page-payment')">← Kembali</button>
+        </div>
+        <div class="qr-body">
+        <div class="qr-order-info">
+            <div class="qr-order-label">ID Transaksi</div>
+            <div class="qr-order-id" id="qrOrderId">TYM-000000</div>
+            <div class="qr-amount" id="qrAmount">Rp 2.500</div>
+            <div class="qr-wallet-name" id="qrWalletName">QRIS Universal</div>
+        </div>
+        <div class="qr-container">
+            <canvas id="qrCanvas" class="qr-code-svg" width="180" height="180"></canvas>
+            <div class="qr-scan-line"></div>
+            <div class="qr-corner tl"></div><div class="qr-corner tr"></div>
+            <div class="qr-corner bl"></div><div class="qr-corner br"></div>
+        </div>
+        <div class="qr-wallet-badge" id="qrBadge"><span>💳</span> QRIS Universal</div>
+        <div class="qr-timer-wrap">
+            <div class="qr-timer-label">QR kedaluwarsa dalam</div>
+            <div class="qr-timer" id="qrTimer">05:00</div>
+        </div>
+        <div class="qr-hint">Buka aplikasi e-wallet Anda,<br>pilih Scan QR, lalu arahkan ke kode di atas</div>
+        <div style="width:100%;display:flex;flex-direction:column;gap:8px;">
+            <button class="btn-cancel-pay" onclick="goTo('page-payment')">Batal & Ganti Metode</button>
+        </div>
+        </div>
+    </div>
+
+
+    <!-- PAGE 5: FILLING -->
+    <div id="page-filling" class="page">
+        <div class="app-header">
+        <div class="app-brand">TOY<span>AMAS</span></div>
+        <div class="hdr-badge" style="background:#e6f9f0;color:#34C38F;" id="fillStatusBadge">Mengisi...</div>
+        </div>
+        <div class="fill-body" id="fillBody">
+        <div class="success-icon" id="successIcon">✓</div>
+        <div class="big-tank" id="bigTank">
+            <div class="big-tank-fill" id="bigFill" style="height:0%">
+            <div class="tank-waves"><div class="tank-wave"></div><div class="tank-wave tank-wave2"></div></div>
+            </div>
+            <div class="tank-fill-label" id="tankLabel">0%</div>
+        </div>
+        <div>
+            <div class="fill-title" id="fillTitle">Mengisi Air...</div>
+            <div class="fill-sub" id="fillSub">Harap tunggu, jangan pindahkan galon</div>
+        </div>
+        <div class="fill-liters"><span id="fillCurrent">0.0</span> <span>/ <span id="fillTarget">5.0</span> L</span></div>
+        <div class="fill-progress-wrap">
+            <div class="fill-progress-label"><span>Progress Pengisian</span><span id="fillPct">0%</span></div>
+            <div class="fill-track"><div class="fill-bar" id="fillBar" style="width:0%"></div></div>
+        </div>
+        <div id="fillDoneBtn" style="display:none;width:100%">
+            <button class="btn-pay" onclick="goToStandby()" style="background:linear-gradient(135deg,#34C38F,#28a871);box-shadow:0 8px 24px rgba(52,195,143,.3);">
+            Selesai — Ambil Galon Anda ✓
+            </button>
+        </div>
+        </div>
+    </div>
+
+
+    <!-- PAGE 5.5: POSITION GUIDE — bottle animation, no container selector -->
+    <div id="page-guide" class="page">
+        <div class="guide-header">
+        <div class="guide-header-top">
+            <div class="guide-brand">TOY<span>AMAS</span></div>
+            <div class="guide-step-badge">LANGKAH TERAKHIR</div>
+        </div>
+        <div class="guide-title">Posisikan Wadah Anda</div>
+        <div class="guide-sub">Pastikan wadah tepat di bawah keran sebelum air mengalir</div>
+        </div>
+
+        <!-- Container selector hidden by CSS -->
+        <div class="container-selector"></div>
+
+        <!-- Main animation scene — bottle model, bigger -->
+        <div class="guide-anim-area">
+        <svg class="scene-svg" id="sceneSvg" viewBox="0 0 260 320" xmlns="http://www.w3.org/2000/svg">
+
+            <!-- DISPENSER MACHINE -->
+            <rect x="80" y="20" width="100" height="130" rx="10" fill="#EBF6FF" stroke="#A8D8F8" stroke-width="2"/>
+            <rect x="80" y="20" width="100" height="32" rx="10" fill="#2A91D8"/>
+            <rect x="80" y="40" width="100" height="12" fill="#2A91D8"/>
+            <rect x="92" y="27" width="76" height="18" rx="4" fill="#1a6fa8"/>
+            <text x="130" y="40" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" fill="#A8D8F8" font-weight="700">TOYAMAS</text>
+            <rect x="92" y="60" width="76" height="4" rx="2" fill="#DCF0FF"/>
+            <rect x="92" y="70" width="50" height="4" rx="2" fill="#DCF0FF"/>
+            <circle cx="155" cy="72" r="4" fill="#34C38F">
+            <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="166" cy="72" r="4" fill="#5BB8F5"/>
+            <rect x="92" y="82" width="76" height="38" rx="6" fill="#DCF0FF" stroke="#A8D8F8" stroke-width="1"/>
+            <rect x="99" y="88" width="18" height="26" rx="4" fill="#A8D8F8"/>
+            <rect x="121" y="88" width="18" height="26" rx="4" fill="#A8D8F8"/>
+            <rect x="143" y="88" width="18" height="26" rx="4" fill="#A8D8F8"/>
+            <text x="108" y="104" text-anchor="middle" font-family="sans-serif" font-size="5" fill="#2A91D8" font-weight="700">RO</text>
+            <text x="130" y="104" text-anchor="middle" font-family="sans-serif" font-size="5" fill="#2A91D8" font-weight="700">UV</text>
+            <text x="152" y="104" text-anchor="middle" font-family="sans-serif" font-size="5" fill="#2A91D8" font-weight="700">CF</text>
+
+            <!-- FAUCET -->
+            <rect x="122" y="148" width="16" height="24" rx="3" fill="#5BB8F5"/>
+            <rect x="104" y="164" width="52" height="14" rx="7" fill="#5BB8F5"/>
+            <rect x="104" y="170" width="12" height="18" rx="3" fill="#2A91D8"/>
+            <ellipse cx="110" cy="188" rx="5" ry="3" fill="#1a5a8a"/>
+
+            <!-- WATER STREAM -->
+            <g id="waterStream">
+            <line x1="110" y1="191" x2="110" y2="248" stroke="#5BB8F5" stroke-width="5" stroke-linecap="round" opacity="0.85">
+                <animate attributeName="stroke-dasharray" values="4 8;8 4;4 8" dur="0.4s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.85;0.5;0.85" dur="0.6s" repeatCount="indefinite"/>
+            </line>
+            <circle cx="107" cy="252" r="3" fill="#A8D8F8" opacity="0.8">
+                <animate attributeName="r" values="3;5;3" dur="0.8s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;0.2;0.8" dur="0.8s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="113" cy="255" r="2" fill="#5BB8F5" opacity="0.6">
+                <animate attributeName="r" values="2;4;2" dur="0.9s" repeatCount="indefinite" begin="0.3s"/>
+            </circle>
+            <circle cx="108" cy="257" r="2" fill="#A8D8F8" opacity="0.7">
+                <animate attributeName="r" values="1;3;1" dur="0.7s" repeatCount="indefinite" begin="0.5s"/>
+            </circle>
+            </g>
+
+            <!-- CONTAINER AREA — bottle model (fixed, no selector) -->
+            <g id="containerGraphic">
+            <!-- Bottle shadow -->
+            <ellipse cx="110" cy="285" rx="22" ry="6" fill="#DCF0FF" opacity="0.5"/>
+            <!-- Bottle body — larger -->
+            <rect x="92" y="230" width="36" height="56" rx="8" fill="#EBF6FF" stroke="#A8D8F8" stroke-width="2"/>
+            <!-- Bottle neck -->
+            <rect x="101" y="215" width="18" height="18" rx="7" fill="#DCF0FF" stroke="#A8D8F8" stroke-width="1.5"/>
+            <!-- Bottle cap -->
+            <ellipse cx="110" cy="215" rx="9" ry="4" fill="#A8D8F8" stroke="#5BB8F5" stroke-width="1.5"/>
+            <!-- Water fill in bottle (animated) -->
+            <rect x="94" y="260" width="32" height="25" rx="0 0 6 6" fill="#5BB8F5" opacity="0.35">
+                <animate attributeName="height" values="4;28;4" dur="2.5s" repeatCount="indefinite"/>
+                <animate attributeName="y" values="281;257;281" dur="2.5s" repeatCount="indefinite"/>
+            </rect>
+            <!-- Bottle highlight -->
+            <rect x="96" y="235" width="8" height="30" rx="4" fill="white" opacity="0.35"/>
+            <!-- Bottle label -->
+            <rect x="96" y="245" width="28" height="18" rx="4" fill="white" opacity="0.55"/>
+            <text x="110" y="257" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="5.5" fill="#2A91D8" font-weight="700">TOYAMAS</text>
+            </g>
+
+            <!-- POSITION ARROW -->
+            <g id="positionArrow">
+            <line x1="110" y1="191" x2="110" y2="212" stroke="#34C38F" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8"/>
+            <polygon points="106,213 114,213 110,220" fill="#34C38F" opacity="0.9"/>
+            <circle cx="110" cy="215" r="9" fill="none" stroke="#34C38F" stroke-width="2" opacity="0.7">
+                <animate attributeName="r" values="9;14;9" dur="1.5s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.7;0.1;0.7" dur="1.5s" repeatCount="indefinite"/>
+            </circle>
+            </g>
+
+            <!-- PLATFORM -->
+            <rect x="60" y="280" width="140" height="8" rx="4" fill="#DCF0FF"/>
+            <rect x="65" y="287" width="130" height="4" rx="2" fill="#A8D8F8" opacity="0.4"/>
+
+            <!-- MEASUREMENT BRACKET -->
+            <line x1="78" y1="191" x2="78" y2="278" stroke="#F0A940" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.7"/>
+            <line x1="74" y1="191" x2="82" y2="191" stroke="#F0A940" stroke-width="1.5" opacity="0.7"/>
+            <line x1="74" y1="278" x2="82" y2="278" stroke="#F0A940" stroke-width="1.5" opacity="0.7"/>
+            <rect x="52" y="226" width="24" height="14" rx="4" fill="#FFF8EC" stroke="#F0A940" stroke-width="1"/>
+            <text x="64" y="236" text-anchor="middle" font-family="sans-serif" font-size="6.5" fill="#8a5c00" font-weight="700">OK ✓</text>
+
+        </svg>
+
+        <div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(91,184,245,.12);border:1.5px dashed var(--sky);border-radius:12px;padding:6px 20px;font-size:.68rem;font-weight:600;color:var(--sky-deep);white-space:nowrap;">
+            ↕ Letakkan tepat di bawah keran
+        </div>
+        </div>
+
+        <div class="guide-alert">
+        <div class="ga-icon">⚠️</div>
+        <div class="ga-text">
+            <strong>Pastikan mulut wadah sejajar dengan keran!</strong>
+            Air akan mengalir otomatis dalam <span id="guideCountSec" style="font-weight:700;color:#8a5c00;">10</span> detik setelah Anda menekan Mulai.
+        </div>
+        </div>
+
+        <div class="guide-checklist">
+        <div class="gcl-item" id="gcl1"><div class="gcl-check" id="gck1">○</div>Wadah sudah diletakkan di bawah keran</div>
+        <div class="gcl-item" id="gcl2"><div class="gcl-check" id="gck2">○</div>Mulut wadah terbuka & tidak tertutup</div>
+        <div class="gcl-item" id="gcl3"><div class="gcl-check" id="gck3">○</div>Posisi stabil, tidak mudah terguling</div>
+        </div>
+
+        <div class="guide-countdown-wrap" id="guideCountdownWrap" style="display:none;">
+        <div class="guide-countdown-bar"><div class="guide-countdown-fill" id="guideCountFill" style="width:100%"></div></div>
+        <div class="guide-countdown-label">Air mengalir dalam <span id="guideCountDisp">10</span> detik...</div>
+        </div>
+
+        <div class="guide-footer">
+        <button class="btn-guide-cancel" onclick="cancelGuide()">✕ Batal</button>
+        <button class="btn-guide-start" id="btnGuideStart" onclick="confirmGuideAndFill()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+            Sudah Siap — Mulai Isi Air
+        </button>
+        </div>
+    </div>
+
+
+    <!-- PAGE 6: ADMIN (ringkas) -->
+    <div id="page-admin" class="page">
+        <div class="app-header">
+            <div class="app-brand">TOY<span>AMAS</span></div>
+            <button class="btn-back" onclick="goToStandby()">← Dashboard</button>
+        </div>
+
+        <div class="admin-body">
+            <!-- Monitoring -->
+            <div>
+                <div class="admin-section">📊 Monitoring Sistem</div>
+                <div class="admin-tile">
+                    <div class="admin-row">
+                        <div class="ar-icon">💧</div>
+                        <div class="ar-info"><div class="ar-name">Galon 1 (Utama)</div><div class="ar-sub">Solenoid Valve RO 1 — Standby</div></div>
+                        <div class="ar-val" id="adG1">75% — 14.3L</div>
+                    </div>
+                    <div class="admin-row">
+                        <div class="ar-icon">💧</div>
+                        <div class="ar-info"><div class="ar-name">Galon 2 (Cadangan)</div><div class="ar-sub">Solenoid Valve RO 2 — Standby</div></div>
+                        <div class="ar-val" id="adG2">45% — 8.6L</div>
+                    </div>
+                    <div class="admin-row">
+                        <div class="ar-icon">⚙️</div>
+                        <div class="ar-info"><div class="ar-name">Mesin RO</div><div class="ar-sub">Produksi aktif, tekanan normal</div></div>
+                        <div class="ar-val" style="color:var(--success)">ON • 1.2 Bar</div>
+                    </div>
+                    <div class="admin-row">
+                        <div class="ar-icon">⚡</div>
+                        <div class="ar-info"><div class="ar-name">Pompa DC</div><div class="ar-sub">Daya dan aliran normal</div></div>
+                        <div class="ar-val" style="color:var(--success)">Aktif</div>
+                    </div>
+                    <div class="admin-row">
+                        <span class="ar-icon">⚙️</span>
+                        <span class="ar-info"><span class="ar-name">Mode Mesin</span></span>
+                        <span class="ar-val" id="adminCurrentMode">RO</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Laporan -->
+            <div>
+                <div class="admin-section">💰 Laporan Hari Ini</div>
+                <div class="admin-tile">
+                    <div class="admin-row">
+                        <div class="ar-icon">📈</div>
+                        <div class="ar-info"><div class="ar-name">Total Transaksi</div><div class="ar-sub">Sejak pukul 00:00</div></div>
+                        <div class="ar-val" id="adminReportTotal">28</div>
+                    </div>
+                    <div class="admin-row">
+                        <div class="ar-icon">🪣</div>
+                        <div class="ar-info"><div class="ar-name">Volume Terjual</div><div class="ar-sub">Kapasitas harian 300L</div></div>
+                        <div class="ar-val" id="adminReportVolume">142 L</div>
+                    </div>
+                    <div class="admin-row">
+                        <div class="ar-icon">💵</div>
+                        <div class="ar-info"><div class="ar-name">Pendapatan</div><div class="ar-sub">Setelah fee payment gateway</div></div>
+                        <div class="ar-val" style="color:var(--success)" id="adminReportRevenue">Rp 70.200</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tombol Darurat -->
+            <div>
+                <div class="admin-section">🛑 Perintah Darurat</div>
+                <div class="admin-tile" style="display:flex; gap:10px; padding:16px; flex-wrap:wrap;">
+                    <button id="adminStopBtn" class="btn-danger" style="flex:1; background:var(--danger); color:white; border:none; border-radius:var(--r-sm); padding:12px; font-weight:700; cursor:pointer;">⛔ STOP</button>
+                    <button id="adminResetBtn" class="btn-warning" style="flex:1; background:var(--warn); color:white; border:none; border-radius:var(--r-sm); padding:12px; font-weight:700; cursor:pointer;">🔄 RESET</button>
+                    <button id="adminPingBtn" class="btn-info" style="flex:1; background:var(--sky); color:white; border:none; border-radius:var(--r-sm); padding:12px; font-weight:700; cursor:pointer;">📡 PING</button>
+                </div>
+            </div>
+
+            <!-- Informasi tambahan (config read-only) -->
+            <div>
+                <div class="admin-section">ℹ️ Pengaturan Saat Ini</div>
+                <div class="admin-tile">
+                    <div class="admin-row">
+                        <span class="ar-icon">💲</span>
+                        <span class="ar-info"><span class="ar-name">Harga per Liter</span></span>
+                        <span class="ar-val" id="adminCurrentPrice">Rp 500</span>
+                    </div>
+                    <div class="admin-row">
+                        <span class="ar-icon">⏱️</span>
+                        <span class="ar-info"><span class="ar-name">Timeout Standby</span></span>
+                        <span class="ar-val" id="adminCurrentTimeout">30 detik</span>
+                    </div>
+                    <div class="admin-row">
+                        <span class="ar-icon">🖼️</span>
+                        <span class="ar-info"><span class="ar-name">Mode Signage</span></span>
+                        <span class="ar-val" id="adminCurrentSignage">Aktif</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+ 
+    <!-- ADMIN PIN MODAL -->
+    <div class="modal-overlay" id="pinModal">
+        <div class="modal-sheet">
+        <div class="modal-title">🔒 Masukkan PIN Admin</div>
+        <div class="modal-sub">Diperlukan untuk mengakses panel pengaturan</div>
+        <!-- Back button — kembali ke dashboard tanpa login -->
+        <button class="modal-back-btn" onclick="closePinModal()">✕ Kembali</button>
+        <div class="pin-display" id="pinDisplay">
+            <div class="pin-dot" id="pd0"></div>
+            <div class="pin-dot" id="pd1"></div>
+            <div class="pin-dot" id="pd2"></div>
+            <div class="pin-dot" id="pd3"></div>
+        </div>
+        <div class="pin-grid">
+            <button class="pin-key" data-value="1">1</button>
+            <button class="pin-key" data-value="2">2</button>
+            <button class="pin-key" data-value="3">3</button>
+            <button class="pin-key" data-value="4">4</button>
+            <button class="pin-key" data-value="5">5</button>
+            <button class="pin-key" data-value="6">6</button>
+            <button class="pin-key" data-value="7">7</button>
+            <button class="pin-key" data-value="8">8</button>
+            <button class="pin-key" data-value="9">9</button>
+            <button class="pin-key del" data-value="del">⌫ Del</button>
+            <button class="pin-key" data-value="0">0</button>
+            <button class="pin-key enter" data-value="enter">Masuk →</button>
+        </div>
+        </div>
+    </div>
+
+
+    <!-- CUSTOM VOLUME KEYBOARD MODAL -->
+    <div class="custom-kb-modal" id="customKbModal">
+        <div class="custom-kb-sheet">
+        <div class="ckb-title">✏️ Masukkan Volume Manual</div>
+        <div class="ckb-sub">Min 100 ml — Maks 2000 ml</div>
+        <div class="ckb-display">
+            <div class="ckb-value" id="ckbValue">0</div>
+            <div>
+            <div class="ckb-unit">ml</div>
+            <div class="ckb-hint" id="ckbPriceHint">= Rp 0</div>
+            </div>
+        </div>
+        <div class="ckb-error" id="ckbError">Volume harus antara 100 ml dan 2000 ml</div>
+        <div class="ckb-grid">
+            <button class="ckb-key" onclick="ckbPress('1')">1</button>
+            <button class="ckb-key" onclick="ckbPress('2')">2</button>
+            <button class="ckb-key" onclick="ckbPress('3')">3</button>
+            <button class="ckb-key" onclick="ckbPress('4')">4</button>
+            <button class="ckb-key" onclick="ckbPress('5')">5</button>
+            <button class="ckb-key" onclick="ckbPress('6')">6</button>
+            <button class="ckb-key" onclick="ckbPress('7')">7</button>
+            <button class="ckb-key" onclick="ckbPress('8')">8</button>
+            <button class="ckb-key" onclick="ckbPress('9')">9</button>
+            <button class="ckb-key" onclick="ckbPress('00')">00</button>
+            <button class="ckb-key" onclick="ckbPress('0')">0</button>
+            <button class="ckb-key del" onclick="ckbDel()">⌫</button>
+            <button class="ckb-key" style="grid-column:1/3;" onclick="ckbCancel()">Batal</button>
+            <button class="ckb-key ok" onclick="ckbOk()">OK ✓</button>
+        </div>
+        </div>
+    </div>
+
+
+    <!-- TOAST -->
+    <div id="toast"></div>
+
+    </div><!-- /screen -->
+
+
+    <!-- SECRET TAP ZONES — tidak terlihat, hanya aktif di halaman standby -->
+    <div id="tapZoneAdmin"
+        style="position:fixed;bottom:0;left:0;width:60px;height:60px;z-index:9999;
+                background:transparent;cursor:default;"
+        aria-hidden="true">
+    </div>
+    <div id="tapZonePreview"
+        style="position:fixed;bottom:0;right:0;width:60px;height:60px;z-index:9999;
+                background:transparent;cursor:default;"
+        aria-hidden="true">
+    </div>
+
+<!-- QR generator (dipakai untuk render qr_string dari Xendit jadi QR image asli) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"
+        integrity="sha512-pUhApVQtLbnpLtJn6DuzDD5o2xtmLJnJ7oBoMsBnzOkVkpqofGLGPaBJ6ayD2zQe3lCgCibhJBi4cj5wAxwVKA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<!-- MODULES - Load in correct order -->
+<script src="js/state.js"></script>
+<script src="js/api.js"></script>
+<script src="js/clock.js"></script>
+<script src="js/galon.js"></script>
+<script src="js/signage.js"></script>
+<script src="js/filling.js"></script>
+<script src="js/ticket.js"></script>
+<script src="js/admin.js"></script>
+
+<!-- MAIN APP - Bridge/Compatibility layer -->
+<script src="js/app.js"></script>
+
+<!-- Fallback jika ada error -->
+<script>
+
+ // Fungsi global openTicketPage sebagai fallback jika TicketUI belum siap
+window.openTicketPage = function() {
+    if (window.TicketUI && typeof TicketUI.open === 'function') {
+        TicketUI.open();
+    } else {
+        // Fallback: langsung pindah ke halaman input
+        goTo('page-ticket-code');
+        // Fokus ke input
+        setTimeout(function() {
+            var input = document.getElementById('ticketCodeInput');
+            if (input) input.focus();
+        }, 300);
+    }
+};
+   
+// Emergency fallback jika clock tidak muncul
+(function() {
+    setTimeout(function() {
+        var sClock = document.getElementById('sClock');
+        var sDate = document.getElementById('sDate');
+        if (sClock && sClock.textContent === '00:00') {
+            console.log('[Emergency] Clock fallback triggered');
+            function updateClock() {
+                var d = new Date();
+                sClock.textContent = d.toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                sDate.textContent = d.toLocaleDateString('id-ID', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                }).toUpperCase();
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+    }, 2000);
+})();
+</script>
+</html>

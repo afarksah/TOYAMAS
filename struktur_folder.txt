@@ -1,0 +1,96 @@
+Struktur Folder toyamas-dispenser-v4.7.6.2
+
+toyamas-dispenser-v4.7.6.2/
+│
+├── backend/
+│   ├── main.py                        ← entry point FastAPI (routers, static mounts, health check)
+│   ├── create_admin.py                ← buat/reset akun admin pertama (username: admin, password: toyamas123)
+│   ├── midtrans_webhook_sim.py        ← simulasi webhook pembayaran Midtrans (testing lokal)
+│   ├── .env                           ← config rahasia (JANGAN commit ke Git)
+│   │
+│   ├── config/
+│   │   └── settings.py                ← semua konfigurasi terpusat (MQTT, JWT, Midtrans, WS, dsb.)
+│   │
+│   ├── middleware/
+│   │   └── auth.py                    ← bcrypt (admin), JWT session, HMAC ESP32↔backend, verifikasi Midtrans
+│   │
+│   ├── routes/
+│   │   ├── auth.py                    ← login/logout admin (username + password)
+│   │   ├── iot.py                     ← dashboard, daftar mesin, charts, transaksi, lokasi, global settings
+│   │   ├── iot_settings.py            ← config per mesin, PIN, upload/kelola slide signage
+│   │   ├── payment.py                 ← create/confirm/start-dispense, webhook Midtrans
+│   │   ├── ticket.py                  ← sesi QR kiosk + redeem tiket dari aplikasi user
+│   │   ├── hardware.py                ← status mesin, laporan harian, config & command panel admin kiosk
+│   │   └── websocket.py               ← WS kiosk (dikelola mqtt_bridge) & WS dashboard IoT (/ws/iot/{user_id})
+│   │
+│   ├── services/
+│   │   ├── database.py                ← semua query SQLite + migration runner
+│   │   └── mqtt_bridge.py             ← klien MQTT (subscribe wildcard semua mesin), publish command ke ESP32
+│   │
+│   ├── database/
+│   │   └── toyamas_local.db           ← file SQLite (dibuat otomatis oleh init_database())
+│   │
+│   ├── uploads/
+│   │   └── signage/                   ← file media slide kiosk, disajikan di /media/signage
+│   │       ├── TYM-001/
+│   │       ├── TYM-002/
+│   │       └── TYM-003/
+│   │
+│   ├── frontend/                      ← UI KIOSK (disajikan di "/")
+│   │   ├── index.html
+│   │   ├── css/
+│   │   │   └── style.css
+│   │   ├── js/
+│   │   │   ├── api.js
+│   │   │   ├── app.js
+│   │   │   ├── state.js
+│   │   │   ├── clock.js
+│   │   │   ├── filling.js
+│   │   │   ├── galon.js
+│   │   │   ├── signage.js
+│   │   │   └── ticket.js
+│   │   └── assets/
+│   │       └── logo-toyamas.png
+│   │
+│   └── iot/                           ← UI DASHBOARD ADMIN (disajikan di "/iot-dashboard")
+│       ├── index.html
+│       ├── css/
+│       │   └── dashboard.css
+│       ├── js/
+│       │   ├── app.js
+│       │   ├── auth.js                ← login dashboard, username + password (BUKAN Google OAuth)
+│       │   ├── websocket.js
+│       │   ├── charts.js
+│       │   ├── transactions.js
+│       │   └── location.js
+│       └── assets/
+│           └── logo-toyamas.png
+│
+├── database/
+│   ├── 001_init.sql                   ← skema awal (machines, transactions, sensor_logs, dst.)
+│   ├── schema_cloudflare_d1.sql       ← skema opsional untuk Cloudflare D1 (tiket, luar repo ini)
+│   └── migrations/                    ← dijalankan otomatis & berurutan tiap startup backend
+│       ├── 002_add_location.sql            (kolom lokasi + IP mesin)
+│       ├── 003_add_hourly_sales.sql         (tabel + trigger sales_hourly)
+│       ├── 004_add_admins.sql               (tabel admins: username + password_hash bcrypt)
+│       ├── 005_fix_sales_hourly_timezone.sql
+│       ├── 006_add_machine_secret.sql       (kolom machines.secret, HMAC per-mesin)
+│       ├── 007_add_machine_soft_delete.sql  (kolom is_active, deleted_at)
+│       ├── 008_add_signage_slides.sql       (tabel machine_signage_slides)
+│       └── 009_add_app_config.sql           (tabel app_config: default_price, default_mode)
+│
+├── toyamas_mqtt_simulator_Mesin.py    ← simulator MQTT multi-mesin (TYM-001/002/003) tanpa hardware fisik
+├── requirements.txt                   ← HANYA ada di root ini (bukan di dalam backend/) — jalankan
+│                                          `pip install -r requirements.txt` dari folder root, sebelum `cd backend`
+├── PAYLOAD_SPEC.md                    ← spesifikasi lengkap semua format data (MQTT, REST, WS, HMAC, DB)
+├── SETUP_GUIDE.md                     ← panduan instalasi & penggunaan lengkap
+├── PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md ← 4 metode update firmware ESP32 (USB/OTA HTTP/OTA LAN/OTA AP)
+├── CHANGELOG_MULTI_MESIN.md           ← riwayat perubahan untuk dukungan armada multi-mesin
+└── struktur_folder.txt                ← dokumen ini
+
+Catatan:
+- Firmware ESP32 (file .ino) disimpan TERPISAH dari repo backend ini — tidak
+  ada di folder ini, di-flash manual lewat Arduino IDE atau OTA. Lihat
+  PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md.
+- File __pycache__/ dan file .db tidak didaftar di atas (artefak runtime,
+  bukan bagian dari source code).
