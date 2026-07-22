@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+.env.*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Upload
+uploads/
+
+# Python virtual env
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# IDE
+.idea/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Log
+*.log
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+
+# Build
+build/
+dist/
+
+# Bytecode
+*.pyd
+
+# Temporary
+*.tmp
