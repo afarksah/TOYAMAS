@@ -9,8 +9,11 @@
 toyamas-dispenser-v4.7.6.2/
 ├── backend/
 │   ├── main.py                 ← entry point FastAPI
-│   ├── create_admin.py         ← buat/reset akun admin pertama (§3.3)
-│   ├── midtrans_webhook_sim.py ← simulasi webhook pembayaran (§4)
+│   ├── create_admin.py         ← buat/reset akun admin pertama 
+│   ├── xendit_webhook_sim.py   ← simulasi webhook pembayaran
+│   ├── xendit_simulate_scan.py ← simulasi scan sukses pembayaran
+│   ├── xendit_ticket_sim.py    ← simulasi scan ticket sukses pembayaran
+│   ├── generate_fake_tickets.py ← generate fake tiket simulasi
 │   ├── .env                    ← config rahasia (JANGAN commit ke Git)
 │   ├── config/settings.py      ← semua konfigurasi terpusat
 │   ├── middleware/auth.py      ← bcrypt (admin), JWT, HMAC ESP32↔backend, verifikasi Midtrans
@@ -26,14 +29,14 @@ toyamas-dispenser-v4.7.6.2/
 ├── database/
 │   ├── 001_init.sql
 │   ├── schema_cloudflare_d1.sql
-│   └── migrations/              ← 002–009, dijalankan otomatis & berurutan tiap startup
-├── toyamas_mqtt_simulator_Mesin.py  ← simulator MQTT multi-mesin tanpa hardware (§3.7)
+│   └── migrations/              ← 002–010, dijalankan otomatis & berurutan tiap startup
+├── toyamas_mqtt_simulator_Mesin.py  ← simulator MQTT multi-mesin tanpa hardware dengan 3 id mesin
 ├── requirements.txt              ← HANYA di root ini, TIDAK ada salinan di dalam backend/
 ├── PAYLOAD_SPEC.md              ← spesifikasi lengkap semua format data
 └── SETUP_GUIDE.md               ← dokumen ini
 ```
 
-Lihat `struktur_folder.txt` untuk daftar file lengkap. Firmware ESP32 disimpan terpisah dari repo backend ini — flash manual lewat Arduino IDE (§5), atau update wireless lewat OTA (lihat `PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md` untuk 4 metode lengkap) setelah firmware pertama kali ter-flash.
+Lihat `struktur_folder.md` untuk daftar file lengkap. Firmware ESP32 disimpan terpisah dari repo backend ini — flash manual lewat Arduino IDE, atau update wireless lewat OTA (lihat `PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md` untuk 3 metode lengkap) setelah firmware pertama kali ter-flash.
 
 ---
 
@@ -42,12 +45,11 @@ Lihat `struktur_folder.txt` untuk daftar file lengkap. Firmware ESP32 disimpan t
 - **Python 3.11+** dan `pip`
 - **Arduino IDE** + **ESP32 Core 3.x** (IDF v5.x)
 - Library Arduino: `PubSubClient` 2.8+, `ArduinoJson` 7.x, `ezButton` 1.0+ (via Library Manager). `WiFi`, `WiFiClient`, `WebServer`, `Update` sudah bawaan ESP32 core (dipakai fitur OTA), tidak perlu install manual.
-- Akun **Midtrans Sandbox** — https://dashboard.sandbox.midtrans.com
+- Akun **Xendit** — https://dashboard.xendit.co/
 - (Opsional) Broker MQTT sendiri — default pakai broker publik `broker.emqx.io`, cukup untuk development, **jangan untuk produksi**
 
-> Versi sebelumnya dokumen ini mensyaratkan Google Cloud OAuth Client ID untuk
-> login dashboard IoT. **Sudah tidak berlaku** — login dashboard sekarang
-> memakai username + password (bcrypt), lihat §3.3.
+login dashboard sekarang
+> memakai username + password (bcrypt), lihat
 
 ---
 
@@ -64,20 +66,22 @@ cd backend
 
 ### 3.2 Isi `.env`
 ```ini
+# ─────────────────────────────────────────
+# Copy ke .env dan isi nilainya
+# JANGAN commit .env ke Git!
+# ─────────────────────────────────────────
+
 # Identitas mesin
 MACHINE_ID=TYM-001
 APP_ENV=development
 
 # Security
-JWT_SECRET=<generate: python -c "import secrets; print(secrets.token_hex(32))">
-
-# HMAC fallback — dipakai HANYA untuk mesin yang belum punya secret sendiri
-# di kolom `machines.secret` (mis. TYM-001 kalau didaftarkan manual lewat
-# 001_init.sql, bukan lewat POST /api/iot/machines). Mesin yang didaftarkan
-# lewat endpoint tersebut dapat secret UNIK sendiri secara otomatis — lihat
-# §3.6. HARUS SAMA PERSIS dengan MACHINE_SECRET di firmware mesin yang
-# memakai fallback ini (§5.2).
+JWT_SECRET=554c14417c74a7fd9cce8932488e57d2ea6fb05d083ca80ffc387e3e10d16552
 MACHINE_SECRET=toyamas-esp32-hmac-secret
+
+# Bcrypt rounds (semakin tinggi semakin aman namun lebih lambat)
+# Default 12 cukup untuk keamanan dan performa
+BCRYPT_ROUNDS=12
 
 # MQTT
 MQTT_BROKER=broker.emqx.io
@@ -86,11 +90,14 @@ MQTT_USERNAME=
 MQTT_PASSWORD=
 MQTT_USE_TLS=false
 
-# Midtrans SANDBOX — dashboard.sandbox.midtrans.com → Settings → Access Keys  ⚠️
-MIDTRANS_SERVER_KEY=Mid-server-xxxxxxxxxx
-MIDTRANS_IS_SANDBOX=true
+# Xendit — ambil dari dashboard.xendit.co → Settings → API Keys
+# Pakai key 'xnd_development_...' untuk testing, 'xnd_production_...' untuk transaksi asli
+XENDIT_SECRET_KEY=xnd_development_TfwbVVTeWeM8gEHuVmUME3M93sKejEUM1GEwecrkDMkyaAjBpRgJUoyw4PLcR5
+# Xendit → Settings → Webhooks → Verification Token
+XENDIT_CALLBACK_TOKEN=FqYnO1ytxf80U8xtDSTC5NV2F0Fqh1r3gMQQk26OjHCjS6vv
 
-# Cloudflare — KOSONGKAN kalau belum deploy Worker+D1 sendiri
+
+# Cloudflare (isi jika sudah ada)
 CF_ACCOUNT_ID=
 CF_API_TOKEN=
 CF_D1_DB_ID=
@@ -99,17 +106,13 @@ CF_WORKER_URL=https://toyamas-api.your-worker.workers.dev
 # Server
 PORT=8000
 
-# Opsional — override default (boleh dihapus)
-# TIMEZONE_OFFSET_HOURS=8            # WITA. 7=WIB, 9=WIT
-# MACHINE_OFFLINE_TIMEOUT_SEC=30
-# BCRYPT_ROUNDS=12
-# IOT_WS_REFRESH_STATUS_SEC=2        # interval broadcast status dashboard IoT
-# IOT_WS_REFRESH_SALES_SEC=5         # interval broadcast ringkasan penjualan
+# Dashboard IoT — interval refresh WebSocket (detik). Opsional, boleh
+# dikosongkan/dihapus baris ini kalau mau pakai default (2 & 5 detik).
+IOT_WS_REFRESH_STATUS_SEC=2
+IOT_WS_REFRESH_SALES_SEC=5
 ```
 
-⚠️ `MIDTRANS_SERVER_KEY` dalam bentuk **teks asli** (`Mid-server-...`), bukan base64. Untuk mesin yang memakai `MACHINE_SECRET` fallback ini, nilainya harus **identik** dengan firmware — beda satu karakter, semua komunikasi MQTT (masuk maupun command keluar) ditolak diam-diam (cek log server: `[SEC] HMAC MISMATCH`, atau Serial Monitor ESP32: `[SEC] HMAC fail`).
-
-**Catatan penting:** `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_REDIRECT_URI`/`ADMIN_WHITELIST` yang dulu ada di sini **sudah tidak dipakai** — `config/settings.py` tidak lagi membacanya sama sekali. Boleh dihapus dari `.env` kalau masih tersisa dari setup lama, tidak berpengaruh apa-apa kalau dibiarkan juga (variabel yang tidak dibaca kode diabaikan begitu saja).
+⚠️ Untuk mesin yang memakai `MACHINE_SECRET` fallback ini, nilainya harus **identik** dengan firmware — beda satu karakter, semua komunikasi MQTT (masuk maupun command keluar) ditolak diam-diam (cek log server: `[SEC] HMAC MISMATCH`, atau Serial Monitor ESP32: `[SEC] HMAC fail`).
 
 ### 3.3 Setup Admin Dashboard (Username + Password)
 
@@ -154,8 +157,8 @@ Log yang diharapkan (startup pertama kali):
 ### 3.5 Akses UI
 | URL | Untuk |
 |---|---|
-| `http://localhost:8000/` | UI Kiosk |
-| `http://localhost:8000/iot-dashboard` | Dashboard admin/IoT (login §3.3) |
+| `http://localhost:8000/` | UI Kiosk | 
+| `http://localhost:8000/iot-dashboard` | Dashboard admin/IoT (login) |
 | `http://localhost:8000/docs` | Swagger API docs |
 
 ### 3.6 Menambah Mesin ke Armada (Multi-Mesin: TYM-002, TYM-003, dst)
@@ -164,7 +167,7 @@ Satu backend ini melayani SELURUH armada sekaligus (bukan satu backend per
 mesin) — MQTT bridge subscribe wildcard ke semua `toyamas/+/status`, dst.
 Untuk menambah mesin baru:
 
-1. Login dashboard IoT (`/iot-dashboard`, §3.3) → halaman **Status Mesin** →
+1. Login dashboard IoT (`/iot-dashboard`) → halaman **OVERVIEW** →
    tombol **"+ Tambah Mesin"** (atau `POST /api/iot/machines` langsung).
 2. Isi ID Mesin (mis. `TYM-002`, harus sama persis dengan yang akan
    dipakai di firmware unit itu), Nama, PIN Admin 4 digit, dst.
@@ -176,7 +179,7 @@ Untuk menambah mesin baru:
    const char* MACHINE_ID     = "TYM-002";              // sama dgn yang didaftarkan
    const char* MACHINE_SECRET = "<secret dari response>"; // BUKAN yang di .env
    ```
-5. Flash firmware ke ESP32 unit itu (§5).
+5. Flash firmware ke ESP32 unit itu.
 
 > Kenapa secret-nya beda per mesin (bukan pakai `MACHINE_SECRET` di `.env`
 > untuk semua)? Karena `machine_id` itu publik (ada di topic MQTT) — kalau
