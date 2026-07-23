@@ -72,6 +72,23 @@ if not JWT_SECRET:
 def colorize(text: str, code: str) -> str:
     return f"\033[{code}m{text}\033[0m"
 
+def extract_error(body: dict) -> tuple:
+    """
+    Ambil (error_code, message) dari body respons, mendukung DUA bentuk:
+    - Rejection bisnis biasa (200, success:false): {"error": "...", "message"?: "..."}
+    - Error sistem (4xx/5xx via HTTPException): {"detail": {"error": "...", "message": "..."}}
+    Tanpa ini, kasus 500 INTERNAL_ERROR salah kebaca sebagai "UNKNOWN_ERROR"
+    karena error code-nya ada di dalam body["detail"], bukan di top-level.
+    """
+    if not isinstance(body, dict):
+        return "UNKNOWN_ERROR", str(body)
+    detail = body.get("detail")
+    if isinstance(detail, dict):
+        return detail.get("error", "UNKNOWN_ERROR"), detail.get("message", "Tidak ada detail")
+    if isinstance(detail, str):
+        return "UNKNOWN_ERROR", detail
+    return body.get("error", "UNKNOWN_ERROR"), body.get("message", "Tidak ada detail")
+
 def build_user_jwt(user_id: str) -> str:
     """Buat JWT untuk user (harus sama dengan account_id di tiket)."""
     now = int(time.time())
@@ -145,9 +162,9 @@ def run_with_suffix(suffix: str, machine_id: str = "TYM-001"):
     print(f"\n  Mencari tiket dengan suffix: {colorize(suffix, '36')} ...")
     result = call_verify_code(suffix, machine_id)
     if not result["ok"]:
-        error = result["body"].get("error", "UNKNOWN")
+        error, msg = extract_error(result["body"])
         print(f"  {colorize('❌ Gagal verifikasi kode:', '31')} {error}")
-        print(f"  Pesan: {result['body'].get('message', 'Tidak ada detail')}")
+        print(f"  Pesan: {msg}")
         sys.exit(1)
 
     data = result["body"]
@@ -204,7 +221,7 @@ def run_with_suffix(suffix: str, machine_id: str = "TYM-001"):
     else:
         status = result2["status_code"]
         body = result2["body"]
-        error = body.get("error", "UNKNOWN_ERROR") if isinstance(body, dict) else "UNKNOWN"
+        error, msg = extract_error(body)
         error_map = {
             "SESSION_INVALID_OR_EXPIRED": "Session sudah expired atau tidak ditemukan.",
             "USER_AUTH_INVALID": "user_jwt tidak valid. Cek JWT_SECRET di .env.",
@@ -216,7 +233,7 @@ def run_with_suffix(suffix: str, machine_id: str = "TYM-001"):
         }
         print(f"  {colorize(f'❌ GAGAL (HTTP {status})', '31')}")
         print(f"  error:   {error}")
-        print(f"  message: {error_map.get(error, body.get('message', 'Tidak ada detail'))}")
+        print(f"  message: {error_map.get(error, msg)}")
     print("─" * 62)
 
 
@@ -276,7 +293,7 @@ def run_manual(verify_session: str, user_id: str):
     else:
         status = result["status_code"]
         body = result["body"]
-        error = body.get("error", "UNKNOWN_ERROR") if isinstance(body, dict) else "UNKNOWN"
+        error, msg = extract_error(body)
         error_map = {
             "SESSION_INVALID_OR_EXPIRED": "Session sudah expired atau tidak ditemukan.",
             "USER_AUTH_INVALID": "user_jwt tidak valid. Cek JWT_SECRET di .env.",
@@ -288,7 +305,7 @@ def run_manual(verify_session: str, user_id: str):
         }
         print(f"  {colorize(f'❌ GAGAL (HTTP {status})', '31')}")
         print(f"  error:   {error}")
-        print(f"  message: {error_map.get(error, body.get('message', 'Tidak ada detail'))}")
+        print(f"  message: {error_map.get(error, msg)}")
     print("─" * 62)
 
 

@@ -746,54 +746,12 @@ window.goToTicketSync = function() {
     }
 };
 
-// ── Simulasi Scan Tiket HP — VERSI REAL (hit backend sungguhan) ──
-// Dipanggil tombol "📱 Simulasi Deteksi Scan Tiket HP" di page-ticket.
-// Beda dari simulateTicketScanSuccess() di bawah (yang cuma fake UI lokal):
-// fungsi ini benar-benar POST ke backend (/api/ticket/dev-simulate-redeem,
-// aktif hanya saat APP_ENV=development), yang di dalamnya menjalankan alur
-// redeem_ticket() ASLI — verifikasi session, redeem tiket, cek galon,
-// broadcast WS 'ticket_verified', kirim MQTT DISPENSE ke ESP32.
-// Setelah fetch ini sukses, TIDAK ada handling tambahan di sini — modal
-// verifikasi + pindah ke page-guide dipicu oleh listener WS yang sudah ada
-// (API.on('ticket_verified', ...)), persis seperti kalau HP asli yang scan.
-window.simulateTicketScanFromPhone = function() {
-    const btn = document.querySelector('#page-ticket .btn-pay');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Mensimulasikan scan HP...';
-    }
-
-    fetch('/api/ticket/dev-simulate-redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            machine_id:   typeof API !== 'undefined' ? API.machineId : undefined,
-            volume_liter: typeof AppState !== 'undefined' ? AppState.selectedVolume : undefined,
-        }),
-    })
-    .then(res => res.json().then(data => ({ ok: res.ok, data })))
-    .then(({ ok, data }) => {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '📱 Simulasi Deteksi Scan Tiket HP';
-        }
-        if (!ok) {
-            const detail = (data && data.detail) || {};
-            showToast('❌ ' + (detail.message || data.message || 'Simulasi scan tiket gagal'));
-            console.warn('[DevSim] Ticket redeem gagal:', data);
-            return;
-        }
-        console.log('[DevSim] Ticket redeem terkirim, menunggu event WS ticket_verified:', data);
-    })
-    .catch(err => {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '📱 Simulasi Deteksi Scan Tiket HP';
-        }
-        showToast('❌ Koneksi ke server gagal saat simulasi scan tiket');
-        console.error('[DevSim] ticket redeem error:', err);
-    });
-};
+// ── Simulasi Scan Tiket HP DIHAPUS ──
+// Endpoint /api/ticket/dev-simulate-redeem sudah dihapus total dari backend
+// dan tombolnya sudah dicabut dari index.html. Testing alur tiket sekarang
+// dilakukan lewat xendit_ticket_sim.py dari terminal (mensimulasikan kiosk
+// verify-code + app HP confirm-scan lewat endpoint produksi asli, tanpa
+// backdoor dev di backend).
 
 
 function goToGuidePage() {

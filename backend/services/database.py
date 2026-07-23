@@ -1249,15 +1249,24 @@ def get_ticket_by_suffix(suffix: str, machine_id: str) -> Optional[dict]:
     Cari tiket berdasarkan 6 digit terakhir (suffix).
     Hanya yang status ACTIVE dan belum expired.
     Return None jika tidak ditemukan, expired, atau sudah dipakai.
+
+    PERBAIKAN: sebelumnya pakai `ticket_code LIKE '%-' || suffix`, dengan
+    `suffix` masuk mentah ke pattern LIKE. Karakter SQL wildcard di LIKE
+    ('%' dan '_') tidak di-escape, jadi kalau suffix yang diinput kebetulan
+    mengandung salah satu karakter itu, artinya berubah jadi "cocok apa saja"
+    bukan literal — bisa memicu false-positive match di luar 6 karakter yang
+    sebenarnya diketik user. Sekarang pakai SUBSTR + perbandingan exact
+    (case-insensitive lewat UPPER di kedua sisi), tidak ada semantik
+    wildcard sama sekali.
     """
     now = datetime.now(timezone.utc).isoformat()
     with db_cursor() as cur:
         cur.execute("""
             SELECT * FROM app_tickets
-            WHERE ticket_code LIKE ?
+            WHERE UPPER(SUBSTR(ticket_code, -6)) = UPPER(?)
               AND status = 'ACTIVE'
               AND expires_at > ?
-        """, (f'%-{suffix}', now))
+        """, (suffix, now))
         rows = cur.fetchall()
     
     # Ambiguous: lebih dari 1 cocok → tolak (keamanan)
@@ -1284,13 +1293,27 @@ def create_verify_session(ticket_code: str, machine_id: str) -> str:
 
 
 def get_verify_session(token: str) -> Optional[dict]:
-    """Ambil data verify_session, cek belum expired & belum dipakai."""
+    """
+    Ambil data verify_session, cek belum expired & belum dipakai.
+
+    PERBAIKAN: sebelumnya bandingnya `expires_at > CURRENT_TIMESTAMP`.
+    expires_at disimpan lewat Python `datetime.isoformat()` (format
+    "2026-07-23T04:14:00.123456+00:00", ada 'T' dan offset zona waktu),
+    sedangkan CURRENT_TIMESTAMP bawaan SQLite formatnya beda
+    ("2026-07-23 04:14:00", pakai spasi, tanpa offset). Dibandingkan
+    sebagai TEKS, karakter 'T' (0x54) selalu > spasi (0x20) di posisi yang
+    sama, jadi expires_at HAMPIR SELALU dianggap "belum lewat" walau
+    faktanya sudah lama kedaluwarsa — sudah dites langsung dan terbukti
+    session yang sengaja dibuat expired 10 menit lalu tetap lolos filter.
+    Sekarang dua sisinya dinormalisasi lewat datetime() SQLite supaya
+    dibandingkan sebagai waktu sungguhan, bukan string mentah.
+    """
     with db_cursor() as cur:
         cur.execute("""
             SELECT * FROM ticket_verify_sessions
             WHERE verify_token = ?
               AND used = 0
-              AND expires_at > CURRENT_TIMESTAMP
+              AND datetime(expires_at) > datetime('now')
         """, (token,))
         row = cur.fetchone()
         return dict(row) if row else None
@@ -1330,14 +1353,39 @@ def get_ticket_by_code(ticket_code: str) -> Optional[dict]:
         return dict(row) if row else None
 
 
-def count_verify_attempts(machine_id: str, window_minutes: int = 10) -> int:
-    """Hitung jumlah percobaan verify-code dari machine_id dalam N menit terakhir."""
+def count_failed_verify_attempts(machine_id: str, window_minutes: int = 10) -> int:
+    """
+    Hitung jumlah percobaan verify-code yang GAGAL dari machine_id dalam
+    N menit terakhir — dipakai buat rate limiting brute-force kode 6 digit.
+
+    PERBAIKAN: fungsi lama (count_verify_attempts) menghitung baris di
+    ticket_verify_sessions, padahal tabel itu CUMA keisi kalau kode yang
+    dimasukkan BENAR (create_verify_session dipanggil setelah tiket
+    ketemu). Akibatnya percobaan kode yang SALAH tidak pernah tercatat di
+    manapun, jadi brute-force tebak kode tidak pernah kena limit sama
+    sekali — limiter-nya baru "aktif" justru kalau orangnya berhasil
+    nebak berkali-kali, kebalikan dari yang seharusnya dicegah. Sekarang
+    dihitung dari tabel ticket_verify_attempts yang mencatat SETIAP
+    percobaan (lihat record_verify_attempt), dan yang dihitung khusus
+    yang GAGAL — supaya user yang kebetulan salah ketik sekali lalu benar
+    tidak ikut kena limit.
+    """
     with db_cursor() as cur:
         cur.execute("""
-            SELECT COUNT(*) as total FROM ticket_verify_sessions
-            WHERE machine_id = ? AND created_at > datetime('now', ?)
+            SELECT COUNT(*) as total FROM ticket_verify_attempts
+            WHERE machine_id = ? AND success = 0
+              AND created_at > datetime('now', ?)
         """, (machine_id, f'-{window_minutes} minutes'))
         return cur.fetchone()['total']
+
+
+def record_verify_attempt(machine_id: str, code: str, success: bool):
+    """Catat SETIAP percobaan verify-code (berhasil maupun gagal)."""
+    with db_cursor() as cur:
+        cur.execute("""
+            INSERT INTO ticket_verify_attempts (machine_id, code_attempted, success)
+            VALUES (?, ?, ?)
+        """, (machine_id, code, 1 if success else 0))
 
 def apply_global_default_to_all_machines(key: str, value: str) -> int:
     """

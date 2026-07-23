@@ -12,38 +12,27 @@ Alur:
 6. User klik "Siap" → jalur confirm-dispense / start-dispense (sama seperti payment)
 """
 import logging
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-import httpx
-from fastapi import APIRouter, HTTPException, Request, status
-from pydantic import BaseModel, Field, validator
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field
 
-from config.settings import (
-    MACHINE_ID, DEBUG,
-    CF_TICKET_REDEEM_URL, CF_API_TOKEN,
-    GALON_EMPTY_PCT
-)
-from middleware.auth import (
-    verify_kiosk_session_token,
-    verify_user_jwt,
-    create_demo_user_jwt,
-)
+from config.settings import MACHINE_ID, GALON_EMPTY_PCT
+from middleware.auth import verify_user_jwt
 from services.database import (
     get_ticket_by_suffix,
     create_verify_session,
     get_verify_session,
-    mark_verify_session_used,
-    mark_ticket_used,
     get_ticket_by_code,
-    count_verify_attempts,
+    count_failed_verify_attempts,
+    record_verify_attempt,
     create_transaction,
     get_state_cache,
     get_machine,
 )
-from services.mqtt_bridge import publish_dispense_command, ws_manager
+from services.mqtt_bridge import ws_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Ticket"])
@@ -60,7 +49,7 @@ class VerifyCodeRequest(BaseModel):
 class VerifyCodeResponse(BaseModel):
     success: bool
     verify_session: Optional[str] = None
-    account_name: Optional[str] = None   # Nama LENGKAP (tidak dimasking)
+    account_name: Optional[str] = None   # NAMA TERMASKING, mis. "B*** S." (lihat _mask_name)
     volume_liter: Optional[float] = None
     ticket_code_masked: Optional[str] = None
     expires_in: int = 180
@@ -75,6 +64,24 @@ class ConfirmScanResponse(BaseModel):
     order_id: Optional[str] = None
     volume_liter: Optional[float] = None
     error: Optional[str] = None
+
+
+def _mask_name(full_name: str) -> str:
+    """
+    'Budi Santoso' -> 'B*** S.'
+    Dipakai KHUSUS di respons verify-code — pada titik ini kepemilikan
+    tiket BELUM diverifikasi (baru ketebak 6 karakter kode), jadi nama
+    lengkap asli tidak boleh tampil ke layar kiosk yang publik. Nama
+    lengkap baru boleh muncul SETELAH confirm-scan sukses (kepemilikan
+    sudah lolos cek user_jwt vs account_id), lihat broadcast WS di bawah.
+    """
+    parts = [p for p in full_name.strip().split() if p]
+    if not parts:
+        return "***"
+    masked_first = parts[0][0] + "***" if len(parts[0]) > 1 else parts[0][0] + "*"
+    if len(parts) == 1:
+        return masked_first
+    return masked_first + " " + parts[-1][0] + "."
 
 
 # ─────────────────────────────────────────
@@ -94,10 +101,16 @@ async def verify_ticket_code(req: VerifyCodeRequest):
     if not machine:
         raise HTTPException(status_code=404, detail="Mesin tidak ditemukan")
 
-    # 2. Rate limiting (5 percobaan / 10 menit)
-    attempts = count_verify_attempts(machine_id, window_minutes=10)
-    if attempts >= 5:
-        logger.warning(f"Rate limit exceeded for machine {machine_id}")
+    # 2. Rate limiting (5 percobaan GAGAL / 10 menit)
+    #    PERBAIKAN: sebelumnya menghitung baris di ticket_verify_sessions,
+    #    yang cuma keisi kalau kode BENAR — jadi tebakan salah tidak pernah
+    #    tercatat/dibatasi. Sekarang dicek dari ticket_verify_attempts yang
+    #    mencatat setiap percobaan (lihat record_verify_attempt di bawah),
+    #    dan dicek SEBELUM lookup supaya percobaan yang sudah kena limit
+    #    tidak usah query app_tickets sama sekali.
+    failed_attempts = count_failed_verify_attempts(machine_id, window_minutes=10)
+    if failed_attempts >= 5:
+        logger.warning(f"Rate limit exceeded for machine {machine_id} ({failed_attempts} percobaan gagal)")
         return VerifyCodeResponse(
             success=False,
             error="RATE_LIMITED",
@@ -108,11 +121,14 @@ async def verify_ticket_code(req: VerifyCodeRequest):
     ticket = get_ticket_by_suffix(req.code, machine_id)
     if not ticket:
         # Jangan bedakan "not found" vs "expired" di response publik
+        record_verify_attempt(machine_id, req.code, success=False)
         return VerifyCodeResponse(
             success=False,
             error="CODE_NOT_FOUND",
             expires_in=0
         )
+
+    record_verify_attempt(machine_id, req.code, success=True)
 
     # 4. Cek apakah tiket ini valid untuk mesin ini? (opsional)
     #    Kita bisa tambahkan kolom allowed_machine_id nanti, tapi untuk sekarang
@@ -133,7 +149,7 @@ async def verify_ticket_code(req: VerifyCodeRequest):
     return VerifyCodeResponse(
         success=True,
         verify_session=token,
-        account_name=ticket["account_name"],  # Nama lengkap (tidak dimasking)
+        account_name=_mask_name(ticket["account_name"]),  # dimasking — lihat _mask_name()
         volume_liter=volume_liter,
         ticket_code_masked=masked_code,
         expires_in=180,  # 3 menit
@@ -272,9 +288,13 @@ async def confirm_ticket_scan(req: ConfirmScanRequest):
 
     except Exception as e:
         logger.error(f"Atomic transaction failed: {e}")
-        return ConfirmScanResponse(
-            success=False,
-            error="INTERNAL_ERROR"
+        # PERBAIKAN: ini kegagalan SISTEM (DB/transaksi), bukan penolakan
+        # bisnis biasa (kode salah, sesi kedaluwarsa, dll) — pantas dapat
+        # status 5xx supaya kelihatan beda di monitoring/log, bukan 200
+        # OK dengan success:false yang menyamarkannya sebagai respons normal.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": "Gagal memproses tiket, coba lagi"}
         )
 
     # 9. Broadcast ke kiosk via WS (event ticket_verified)
@@ -308,23 +328,3 @@ async def confirm_ticket_scan(req: ConfirmScanRequest):
         volume_liter=volume_liter,
         error=None
     )
-
-
-# ─────────────────────────────────────────
-# (Opsional) Simulasi Dev — HAPUS / NONAKTIFKAN di production
-# ─────────────────────────────────────────
-
-@router.post("/api/ticket/dev-simulate-redeem")
-async def dev_simulate_ticket_redeem(request: Request):
-    """
-    [DEV ONLY] Endpoint ini TIDAK DIPAKAI LAGI di alur baru.
-    Dipertahankan untuk kompatibilitas mundur, tapi akan return 404
-    jika APP_ENV=production. Sebaiknya dihapus setelah migrasi.
-    """
-    if not DEBUG:
-        raise HTTPException(status_code=404, detail="Not found")
-    return {
-        "success": False,
-        "message": "Endpoint deprecated. Gunakan verify-code + confirm-scan.",
-        "deprecated": True
-    }
