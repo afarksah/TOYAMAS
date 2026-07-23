@@ -1,6 +1,21 @@
 # TOYAMAS — Master Payload Specification
-**Versi:** 2.4 | **Diperbarui:** 17 Juli 2026 — firmware `1.4.3-http-ota`, backend v4.7.6.2
+**Versi:** 2.5 | **Diperbarui:** 23 Juli 2026 — firmware `1.5.0-ota-lan-ap`, backend v4.7.6.2
 
+> Perubahan v2.5 (§0–§2, khusus bagian ESP32 — bagian lain belum direview ulang
+> di revisi ini): firmware naik dari `1.4.3-http-ota` ke `1.5.0-ota-lan-ap`.
+> **OTA HTTP internet (dulu §0.2, command `OTA_UPDATE`) dihapus dari dokumen
+> ini karena TIDAK ADA implementasinya di firmware yang jalan sekarang** —
+> tidak ada `HTTPClient`, tidak ada verifikasi MD5, tidak ada handler
+> `OTA_UPDATE` di `mqttCallback`. Firmware ini hanya punya OTA LAN (ArduinoOTA)
+> dan OTA AP (WebServer lokal). Field payload `ota.*` diperbaiki sesuai nama
+> asli di kode (`lan_enabled`/`ap_enabled`, bukan `lan_ota_enabled`/
+> `http_in_progress`). §1.1 interval publish `status` dikoreksi (berhenti
+> total saat `DISPENSING`, digantikan topic `flow`, bukan "tiap 10 detik state
+> apa pun"). §1.2/§0 dikoreksi: saat `DUMMY_MODE 1`, ISR flow meter fisik
+> **dimatikan** dan datanya ikut disimulasikan (`dummySimulateFlow()`) — bukan
+> "selalu data real" seperti tercatat sebelumnya. §2 tabel `OTA_ENABLE`/
+> `OTA_DISABLE` ditambah field wajib `type` & `token` yang sebelumnya terlewat.
+>
 > Perubahan v2.4: §3.1 tambah event WS `config_update`/`signage_update` yang
 > sebelumnya belum tercatat; §3.2 koreksi nilai default interval WS
 > (`IOT_WS_REFRESH_STATUS_SEC`/`IOT_WS_REFRESH_SALES_SEC`) sesuai
@@ -13,20 +28,23 @@
 Dokumen ini mendefinisikan **semua format data** yang bergerak antar komponen sistem:
 ESP32 ↔ Backend ↔ Database ↔ UI Kiosk ↔ UI IoT Dashboard ↔ Midtrans ↔ (opsional) Cloudflare
 
-Setiap bagian di bawah ini diverifikasi langsung terhadap kode yang berjalan (`toyamas_firmware_v1_4_3_http_ota.ino`, versi internal `1.4.3-http-ota` — nama file/komentar header/`FIRMWARE_VERSION` sekarang konsisten, sebelumnya sempat beda-beda + `toyamas-dispenser-v4.7.6.2`), bukan rencana/desain awal.
+Bagian §0–§2 (ESP32) di bawah ini diverifikasi langsung terhadap kode yang berjalan
+(`toyamas_firmware_v1_5_0.ino`, `FIRMWARE_VERSION "1.5.0-ota-lan-ap"`), bukan
+rencana/desain awal. Bagian §3 ke bawah (backend/DB/UI) belum direview ulang
+di revisi ini — tanggal verifikasinya masih mengikuti v2.4.
 
 ---
 
 ## 0. Status Firmware
 
-Firmware: `toyamas_firmware_v1_4_3_http_ota.ino`, versi internal **konsisten** di semua tempat (nama file, komentar header, `sys.firmware_ver`) = **`1.4.3-http-ota`**. Sebelum diperbaiki, ketiga tempat itu sempat menyebut angka versi berbeda (`v1.4.3` / `v1.4.0` / `1.4.1-http-ota`) — murni label, tidak pernah ada perbedaan perilaku.
+Firmware: `toyamas_firmware_v1_5_0.ino`, versi internal **konsisten** di semua tempat (nama file, komentar header, `sys.firmware_ver`) = **`1.5.0-ota-lan-ap`**.
 
 **Ringkasan dari histori versi (lihat changelog lengkap di header file `.ino`):**
 
-1. **Mode dummy** (`DUMMY_MODE 1`) → **hanya** sensor ketinggian (ultrasonic JSN-SR04T) yang disimulasikan. Flow meter (`FLOW_PIN`, interrupt `flowPulseISR`) **selalu real hardware**, aktif terlepas dari `DUMMY_MODE`. `system.dummy_mode: true` muncul kalau dikompilasi dummy — **tidak ada** field terpisah `dummy_level_only` di versi ini (field itu sempat direncanakan di versi antara, tapi tidak dipakai di firmware yang jalan sekarang).
+1. **Mode dummy** (`DUMMY_MODE 1`) → sensor ketinggian (ultrasonic JSN-SR04T) **dan** flow meter **sama-sama disimulasikan**. Saat `DUMMY_MODE 1`, `initHardware()` **tidak** memasang interrupt `flowPulseISR` ke `FLOW_PIN` sama sekali ("Hardware ISR dinonaktifkan — pakai data simulasi") — angka aliran datang dari `dummySimulateFlow()` yang menyuntikkan pulsa palsu ke variabel `pulseCount` yang sama, bukan dari sensor fisik. Jadi `flow.current_liters`/`flow.flow_rate_lpm` (topic `flow`, §1.2) **TIDAK bisa dipercaya sebagai angka real saat `DUMMY_MODE 1`** — ini beda dari catatan versi sebelumnya yang bilang flow meter "selalu real hardware terlepas dari DUMMY_MODE". `system.dummy_mode: true` muncul kalau dikompilasi dummy. Tidak ada field terpisah `dummy_level_only` di firmware ini — hanya `system.dummy_mode`.
 2. **Relay polaritas: ACTIVE-LOW** (`digitalWrite(RELAY_x, on ? LOW : HIGH)`) untuk `RELAY_PUMP`, `RELAY_SOL_RO1/RO2`, `RELAY_SOL_P1/P2`, `RELAY_UV`.
-3. **Dual jalur OTA** — lihat §0.1 (AP lokal) dan §0.2 (HTTP lewat internet).
-4. **Sensor suhu DHT11 sudah DIHAPUS** (v1.4.1) — sempat ada di v1.4.0 untuk kontrol kipas, tapi dicabut lagi. Kipas DC 12V (`RELAY_SPARE`) sekarang murni event-driven: ON kalau salah satu solenoid (RO1/RO2/P1/P2) aktif, OFF kalau semua nonaktif. `env.fan_on` tetap ada di payload status, `env.temp_c` **tidak ada** (dan tidak pernah dikirim).
+3. **Dual jalur OTA** — lihat §0.1 (AP lokal) dan §0.2 (LAN/ArduinoOTA). **Tidak ada jalur OTA HTTP/internet** di firmware ini (lihat catatan di §0.2).
+4. **Sensor suhu DHT11 sudah DIHAPUS** — Kipas DC 12V (`RELAY_SPARE`) murni event-driven: ON kalau salah satu solenoid (RO1/RO2/P1/P2) aktif, OFF kalau semua nonaktif. `env.fan_on` tetap ada di payload status, `env.temp_c` **tidak ada** (dan tidak pernah dikirim).
 5. **Relay ke-8** untuk solenoid input RO — otomatis ikut buka kalau SOL_RO1 ATAU SOL_RO2 aktif.
 6. **Alarm audible** — beep ringan buzzer untuk `GALON_LOW` (1x) & `GALON_CRITICAL` (2x), di luar pola beep panjang untuk alarm ERROR.
 
@@ -35,23 +53,29 @@ ESP32 bisa membuka **Access Point WiFi sendiri** khusus update firmware tanpa ka
 - SSID: `TOYAMAS-OTA`, password: `toyamas123`
 - Alamat: `http://192.168.4.1` (buka browser setelah connect ke WiFi itu dari HP/laptop)
 - Upload file `.bin` hasil compile Arduino IDE lewat halaman web itu, device restart otomatis setelah selesai
+- Aktivasi: command MQTT `OTA_ENABLE` dengan `type:"ap"` (§2), **atau** langsung di device tekan tombol **MODE 3x cepat dalam 5 detik** (beep 3x sebagai konfirmasi). Auto-mati sendiri setelah 15 menit (`OTA_AP_TIMEOUT_MS`) kalau tidak dipakai.
+- ⚠️ Beda dari OTA LAN (§0.2): mulai upload di jalur AP **tidak** otomatis memanggil `deactivateAll()` — kalau device sedang dispensing saat upload AP OTA dimulai, pompa/solenoid berpotensi masih menyala.
 
-Ini **tidak melewati MQTT/backend sama sekali** — murni koneksi langsung HP/laptop ↔ ESP32 lewat WiFi lokal. Tidak ada endpoint atau event baru di backend untuk ini.
+Ini **tidak melewati MQTT/backend sama sekali** untuk transfer filenya — murni koneksi langsung HP/laptop ↔ ESP32 lewat WiFi lokal. Tidak ada endpoint atau event baru di backend untuk ini.
 
-### 0.2 OTA HTTP lewat internet — dipicu MQTT, di luar dashboard
-Command `OTA_UPDATE` (§2) membuat ESP32 mendownload `.bin` dari URL server, verifikasi MD5, lalu flash — berjalan di task terpisah (non-blocking), bekerja untuk device di lokasi manapun (beda jaringan dari admin). Ada juga `OTA_ENABLE`/`OTA_DISABLE` untuk toggle OTA LAN (ArduinoOTA/mDNS, hanya jalan kalau laptop admin & ESP32 satu jaringan — **bukan** OTA internet meski nama variabel internal firmware `internetEnabled`, lihat catatan di §0.3).
+### 0.2 OTA LAN (ArduinoOTA) — device & laptop admin satu jaringan
+Aktivasi: command MQTT `OTA_ENABLE` dengan `type:"lan"` (§2), **atau** langsung di device tekan tombol **MODE 6x cepat dalam 10 detik** (beep 2x sebagai konfirmasi). Auto-mati sendiri setelah 5 menit (`OTA_LAN_TIMEOUT_MS`) kalau tidak dipakai, atau matikan manual lewat `OTA_DISABLE`. Begitu update mulai (`ArduinoOTA.onStart()`), firmware otomatis panggil `deactivateAll()` — pompa/solenoid/UV mati semua secara otomatis.
 
-Ketiga command ini **dipicu dari script terpisah `ota_trigger.py`** (lihat `PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md`), **bukan** dari UI dashboard IoT — belum ada tombol/endpoint backend untuk trigger OTA dari dashboard.
+Butuh laptop admin & ESP32 di jaringan WiFi yang sama — **bukan** untuk device di lokasi jauh dari admin.
 
-### 0.3 Catatan penamaan field OTA di payload status
-Field `ota.lan_ota_enabled`/`ota.lan_ota_remaining_sec` (§1.1) melaporkan status OTA **LAN** (ArduinoOTA/mDNS, §0.2), bukan OTA HTTP internet — nama ini sudah diperbaiki dari `internet_enabled`/`internet_remaining_sec` supaya tidak salah dibaca sebagai status OTA internet kalau nanti ditampilkan di dashboard. Variabel internal C++ di firmware (`otaState.internetEnabled`) masih memakai nama lama secara historis (sudah dikomentari jelas di kode), tapi tidak mempengaruhi payload JSON yang keluar.
+> **Tidak ada OTA HTTP/internet di firmware ini.** Versi dokumen sebelumnya (`1.4.3-http-ota`) mencatat adanya command `OTA_UPDATE` untuk download `.bin` dari URL server + verifikasi MD5 — ini **tidak ada** di kode `toyamas_firmware_v1_5_0.ino` yang jalan sekarang (tidak ada `HTTPClient`, tidak ada pengecekan MD5, tidak ada handler `OTA_UPDATE` di `mqttCallback`). Kalau butuh update kios yang jaraknya jauh dan tidak bisa didatangi teknisi, satu-satunya opsi saat ini adalah OTA LAN lewat VPN/tunnel ke jaringan yang sama, atau kirim teknisi (USB/OTA AP) — lihat `PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md`.
+
+Kedua command ini (`OTA_ENABLE`/`OTA_DISABLE`) **dipicu dari script terpisah `ota_trigger.py`** (lihat `PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md`), **bukan** dari UI dashboard IoT — belum ada tombol/endpoint backend untuk trigger OTA dari dashboard.
+
+### 0.3 Nama field OTA di payload status
+Field aktualnya (lihat `publishStatus()` di kode): **`ota.lan_enabled`**, **`ota.ap_enabled`**, **`ota.lan_remaining_sec`** (muncul kalau `lan_enabled: true`), **`ota.ap_remaining_sec`** (muncul kalau `ap_enabled: true`). **Tidak ada** `ota.lan_ota_enabled`, `ota.http_in_progress`, atau `ota.http_progress_pct` — field-field itu tercatat di versi dokumen sebelumnya tapi tidak pernah ada di kode yang jalan.
 
 
 
 ## 1. ESP32 → Backend (MQTT Publish)
 
 ### 1.1 Topic: `toyamas/{machine_id}/status`
-Dikirim setiap **10 detik**, state apa pun.
+Dikirim setiap **10 detik**, **kecuali saat `state == DISPENSING`** — selama dispensing, topic ini **berhenti total** dan digantikan sepenuhnya oleh topic `flow` (§1.2) tiap ~100ms. Keduanya berbagi satu timer publish yang sama di firmware (`taskStatus`), jadi tidak pernah dikirim bersamaan.
 
 ```json
 {
@@ -84,14 +108,15 @@ Dikirim setiap **10 detik**, state apa pun.
     "uptime_sec": 86400,
     "wifi_rssi": -62,
     "free_heap": 180000,
-    "firmware_ver": "1.4.3-http-ota",
+    "firmware_ver": "1.5.0-ota-lan-ap",
     "dummy_mode": true
   },
   "env": { "fan_on": false },
   "ota": {
-    "lan_ota_enabled": false,
+    "lan_enabled": false,
     "ap_enabled": false,
-    "http_in_progress": false
+    "lan_remaining_sec": 240,
+    "ap_remaining_sec": 870
   },
   "machine_status": {
     "online_since": 12,
@@ -107,16 +132,16 @@ Catatan field:
 - `timestamp` **bukan** epoch Unix — ini `millis()/1000` sejak ESP32 boot. Backend memakai waktu server sendiri untuk `last_seen`/`created_at`.
 - `galon.filling_galon` hanya muncul saat `state == "FILLING"`.
 - `galon.g1_estimated`/`g2_estimated` — `true` kalau angka level lagi berasal dari estimasi flow meter (blind-zone ultrasonic), bukan bacaan sensor langsung.
-- `system.dummy_mode` — muncul (selalu `true`) kalau firmware dikompilasi `DUMMY_MODE 1`. Cuma sensor ketinggian yang disimulasikan; flow meter tetap data fisik asli, jadi `flow.current_liters`/`flow.flow_rate_lpm` di topic `flow` (§1.2) selalu bisa dipercaya sebagai angka real bahkan saat mesin dalam mode dummy.
+- `system.dummy_mode` — muncul (selalu `true`) kalau firmware dikompilasi `DUMMY_MODE 1`. **Bukan cuma sensor ketinggian yang disimulasikan** — flow meter fisik ikut dinonaktifkan (lihat §0 poin 1), jadi `flow.current_liters`/`flow.flow_rate_lpm` di topic `flow` (§1.2) **ikut simulasi**, bukan angka real, selama `DUMMY_MODE 1`.
 - `env.fan_on` — status kipas DC 12V (`RELAY_SPARE`), event-driven dari solenoid aktif (§0), bukan dari suhu (DHT11 sudah dihapus).
-- `ota.lan_ota_enabled`/`ota.lan_ota_remaining_sec` (muncul kalau `lan_ota_enabled: true`) — status OTA LAN (§0.2/§0.3), **bukan** OTA internet meski awalnya bernama `internet_enabled`.
-- `ota.ap_enabled`/`ota.ap_remaining_sec` — status OTA AP lokal (§0.1).
-- `ota.http_in_progress`/`ota.http_progress_pct` (muncul saat progress berjalan) — status OTA HTTP lewat internet (§0.2), dipicu command `OTA_UPDATE`.
+- `ota.lan_enabled`/`ota.lan_remaining_sec` (muncul kalau `lan_enabled: true`) — status OTA LAN (§0.2).
+- `ota.ap_enabled`/`ota.ap_remaining_sec` (muncul kalau `ap_enabled: true`) — status OTA AP lokal (§0.1).
+- Tidak ada field `ota.http_in_progress`/`ota.http_progress_pct` — OTA HTTP tidak ada di firmware ini (§0.2).
   > Backend saat ini **belum** membaca field `ota.*` atau `env.fan_on` secara eksplisit (belum ada badge/indikator khusus di dashboard) — datanya tetap tersimpan lengkap di `machine_state_cache.raw_json` kalau suatu saat mau ditampilkan (mis. badge status OTA di halaman Monitoring).
 - `state` salah satu dari: `IDLE | FILLING | DISPENSING | FINISHING | ALERT | ERROR`.
 
 ### 1.2 Topic: `toyamas/{machine_id}/flow`
-Dikirim setiap **~100 ms** hanya saat `state = DISPENSING`. **Selalu dari flow meter fisik asli**, tidak terpengaruh `DUMMY_MODE` (lihat §0).
+Dikirim setiap **~100 ms** hanya saat `state = DISPENSING`. Dari flow meter fisik asli **kecuali saat `DUMMY_MODE 1`**, di mana datanya ikut disimulasikan (lihat §0 poin 1 — ini beda dari catatan versi dokumen sebelumnya).
 
 ```json
 {
@@ -165,7 +190,7 @@ Dikirim **realtime** (event-driven), tidak menunggu interval.
 | `GALON_SWITCH` | INFO | Auto-switch galon aktif |
 | `MODE_CHANGED` | INFO | Ganti mode RO ⇄ MANUAL |
 | `GALON_REPLACED` | INFO | Galon terdeteksi diganti/diisi ulang |
-| `FILL_TIMEOUT` | ERROR | Pengisian galon dari state `FILLING` tidak selesai dalam batas waktu (blind-zone timeout) |
+| `FILL_TIMEOUT` | ERROR | Pengisian galon dari state `FILLING` melebihi batas aman mutlak `RO_FILL_MAX_TIMEOUT_MS` (10 menit). Ini beda dari timer estimasi blind-zone `RO_FILL_BLIND_ZONE_MS` (3 menit) — timer blind-zone menandai galon **selesai/penuh** (tidak memicu alarm), timer ini khusus jaga-jaga kalau pengisian gagal total (mis. solenoid/RO macet) |
 
 ### 1.4 Response PING → PONG
 Dipublish ke **topic `status` yang sama** (bukan topic terpisah):
@@ -195,12 +220,13 @@ QoS 1. **Setiap** command wajib field `hmac` valid (lihat §11) atau ditolak (`[
 | `SET_MODE` | `{"mode": "RO"}` atau `{"mode": "MANUAL"}` | `mode`, `issued_at`, `hmac` |
 | `RESET` | Soft reset (`ESP.restart()`) setelah 300ms | `issued_at`, `hmac` |
 | `PING` | Balasan `PONG` ke topic `status`, lihat §1.4 | `issued_at`, `hmac` |
-| `DUMMY_SET_LEVEL` | **Hanya saat `DUMMY_MODE 1`.** `{"g1_pct": 85.0, "g2_pct": 55.0}` — set level ultrasonic dummy manual (flow meter tidak terpengaruh, tetap real) | `issued_at`, `hmac` |
-| `OTA_ENABLE` | Nyalakan OTA LAN (ArduinoOTA/mDNS, §0.2/§0.3), auto-disable setelah `OTA_INTERNET_TIMEOUT_MS` (default 5 menit) | `issued_at`, `hmac` |
-| `OTA_DISABLE` | Matikan OTA LAN manual sebelum timeout | `issued_at`, `hmac` |
-| `OTA_UPDATE` | `{"url": "https://.../firmware.bin", "target_version": "1.4.3-http-ota", "md5": "..."}` — trigger OTA HTTP lewat internet (§0.2), device download+verifikasi MD5+flash di task terpisah | `issued_at`, `hmac` |
+| `DUMMY_SET_LEVEL` | **Hanya saat `DUMMY_MODE 1`.** `{"g1_pct": 85.0, "g2_pct": 55.0}` — set level ultrasonic dummy manual. **Catatan:** di firmware ini flow meter TIDAK tetap real saat `DUMMY_MODE 1` (lihat §0 poin 1) — command ini cuma mengatur level galon, flow tetap ikut logika simulasi `dummySimulateFlow()` yang berjalan independen | `issued_at`, `hmac` |
+| `OTA_ENABLE` | `{"type": "lan"\|"ap", "token": "..."}` — nyalakan OTA LAN (§0.2, auto-disable 5 menit / `OTA_LAN_TIMEOUT_MS`) atau OTA AP (§0.1, auto-disable 15 menit / `OTA_AP_TIMEOUT_MS`) tergantung `type`. `token` harus cocok dengan `OTA_TOKEN` di firmware, terpisah dari HMAC command biasa — kalau tidak cocok, request diabaikan (`[OTA] Invalid token`) | `type`, `token`, `issued_at`, `hmac` |
+| `OTA_DISABLE` | `{"type": "lan"\|"ap"\|"all", "token": "..."}` — matikan OTA LAN/AP/keduanya manual sebelum timeout. `token` wajib cocok seperti di atas | `type`, `token`, `issued_at`, `hmac` |
 
-`OTA_ENABLE`/`OTA_DISABLE`/`OTA_UPDATE` **dipicu dari script terpisah `ota_trigger.py`** (lihat `PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md`), bukan dari dashboard IoT — belum ada UI/endpoint backend untuk ini.
+**Tidak ada command `OTA_UPDATE` di firmware ini** (lihat §0.2) — versi dokumen sebelumnya mencatat command ini untuk OTA HTTP lewat internet, tapi tidak pernah ada implementasinya di kode yang jalan.
+
+`OTA_ENABLE`/`OTA_DISABLE` **dipicu dari script terpisah `ota_trigger.py`** (lihat `PANDUAN_UPDATE_FIRMWARE_TOYAMAS.md`), bukan dari dashboard IoT — belum ada UI/endpoint backend untuk ini.
 
 Backend mengirim `DISPENSE`, `STOP`, `RESET`, `PING` lewat `/api/admin/command`
 (kiosk) dan `SET_MODE` lewat `POST /api/iot/settings/{machine_id}` (per-mesin)
